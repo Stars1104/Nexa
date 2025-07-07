@@ -165,7 +165,7 @@ const Sidebar = ({ setComponent }: SidebarProps) => {
             </nav>
             {/* Tip */}
             <div className="mt-auto text-sm text-muted-foreground bg-gradient-to-r dark:from-[#1F1F1F] dark:to-[#20010F] from-[#FDF2F8] to-[#FAF5FF] rounded-md p-3">
-                Tip: Take care of your portfolio to increase your chances <span role="img" aria-label="rocket">🚀</span>
+                Dica: Cuide do seu portfólio para aumentar suas chances <span role="img" aria-label="rocket">🚀</span>
             </div>
         </aside>
     );

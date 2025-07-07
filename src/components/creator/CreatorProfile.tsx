@@ -38,13 +38,13 @@ export const CreatorProfile = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-[#171717] p-6">
-            <div className="max-w-5xl mx-auto">
-                <h1 className="text-2xl font-bold mb-1 text-gray-900 dark:text-white">My Account</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Manage your personal information</p>
+        <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] p-6">
+            <div className="w-full">
+                <h1 className="text-2xl font-bold mb-1 text-gray-900 dark:text-white">Minha Conta</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Gerencie suas informações pessoais</p>
                 <div className="bg-background rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-6">
                     <div className="flex justify-between items-start mb-4">
-                        <span className="font-semibold text-base text-gray-900 dark:text-white">Profile information</span>
+                        <span className="font-semibold text-base text-gray-900 dark:text-white">Informações do perfil</span>
                         <button
                             className="flex items-center gap-1 text-pink-500 hover:text-pink-600 text-sm font-medium focus:outline-none"
                             onClick={() => setEditMode(true)}
@@ -69,7 +69,7 @@ export const CreatorProfile = () => {
                         {/* Info grid */}
                         <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-sm mt-2">
                             <div>
-                                <div className="text-gray-400 dark:text-gray-400">State</div>
+                                <div className="text-gray-400 dark:text-gray-400">Estado</div>
                                 <div className="text-gray-900 dark:text-white">{profile.state}</div>
                             </div>
                             <div>
@@ -77,11 +77,11 @@ export const CreatorProfile = () => {
                                 <div className="text-gray-900 dark:text-white">{profile.role}</div>
                             </div>
                             <div>
-                                <div className="text-gray-400 dark:text-gray-400">Spoken languages</div>
+                                <div className="text-gray-400 dark:text-gray-400">Línguas faladas</div>
                                 <div className="text-gray-900 dark:text-white">{profile.languages.join(", ")}</div>
                             </div>
                             <div>
-                                <div className="text-gray-400 dark:text-gray-400">Gender</div>
+                                <div className="text-gray-400 dark:text-gray-400">Gênero</div>
                                 <div className="text-gray-900 dark:text-white">{profile.gender}</div>
                             </div>
                         </div>

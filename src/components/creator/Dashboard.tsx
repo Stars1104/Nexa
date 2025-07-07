@@ -15,6 +15,7 @@ const stats = [
 
 const campaigns = [
     {
+        id: 1,
         title: "Summer Look",
         mark: "ModaX",
         type: "Video · TikTok (15 sec)",
@@ -23,6 +24,7 @@ const campaigns = [
         badge: "NEW",
     },
     {
+        id: 2,
         title: "Headphone Review",
         mark: "TechSound",
         type: "Review · Instagram Reels",
@@ -31,6 +33,7 @@ const campaigns = [
         badge: "NEW",
     },
     {
+        id: 3,
         title: "Healthy Recipe",
         mark: "NutriLife",
         type: "Photo · Post Feed Instagram",
@@ -39,6 +42,7 @@ const campaigns = [
         badge: "NEW",
     },
     {
+        id: 4,
         title: "Skincare Routine",
         mark: "BeautyGlow",
         type: "Video · YouTube Shorts",
@@ -70,9 +74,15 @@ const sortOptions = [
     "Most Popular",
 ];
 
-export default function Dashboard() {
+interface DashboardProps {
+    setComponent?: (component: string) => void;
+    setProjectId?: (projectId: number) => void;
+}
+
+export default function Dashboard({ setComponent, setProjectId }: DashboardProps) {
+
     return (
-        <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 min-h-screen dark:bg-[#171717]">
+        <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 min-h-[92vh] dark:bg-[#171717]">
             {/* Welcome */}
             <div className="flex flex-col gap-2">
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold flex items-center gap-2">
@@ -155,7 +165,10 @@ export default function Dashboard() {
                             </div>
                             <div className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-auto">
                                 <div className="font-bold text-lg sm:text-xl">{c.price}</div>
-                                <Button className="w-full sm:w-auto bg-[#E91E63] hover:bg-[#E91E63]/80 text-white text-sm sm:text-base">
+                                <Button className="w-full sm:w-auto bg-[#E91E63] hover:bg-[#E91E63]/80 text-white text-sm sm:text-base" onClick={() => {
+                                    setComponent("Detalhes do Projeto");
+                                    setProjectId(c.id); 
+                                }}>
                                     See details
                                 </Button>
                             </div>

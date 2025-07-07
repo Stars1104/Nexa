@@ -121,3 +121,13 @@
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, #ec4899, #9333ea);
 }
+
+@media (max-width: 768px) {
+  .scrollbar-hide-mobile::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide-mobile {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

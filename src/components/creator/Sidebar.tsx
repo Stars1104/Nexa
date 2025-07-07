@@ -6,11 +6,11 @@ import { useEffect, useState, useRef } from "react";
 import { useIsMobile } from "../../hooks/use-mobile";
 
 const navLinks = [
-    { label: "Início", icon: Home, key: "dashboard" },
-    { label: "Minhas Aplicações", icon: FileText, key: "my applications" },
-    { label: "Conversas", icon: MessageCircle, key: "conversations" },
-    { label: "Minha Conta", icon: User, key: "my account" },
-    { label: "Meu Portfólio", icon: Briefcase, key: "my portfolio" },
+    { label: "Início", icon: Home, key: "Painel" },
+    { label: "Minhas Aplicações", icon: FileText, key: "Minha Aplicação" },
+    { label: "Conversas", icon: MessageCircle, key: "Chat" },
+    { label: "Minha Conta", icon: User, key: "Minha Conta" },
+    { label: "Meu Portfólio", icon: Briefcase, key: "Portfólio" },
 ];
 
 interface SidebarProps {
@@ -24,7 +24,7 @@ const Sidebar = ({ setComponent }: SidebarProps) => {
     const [isVisible, setIsVisible] = useState(false);
     const closeTimeout = useRef<NodeJS.Timeout | null>(null);
     const isMobile = useIsMobile();
-    
+
     useEffect(() => {
         const checkTheme = () => {
             setIsDarkMode(document.documentElement.classList.contains('dark'));
@@ -147,9 +147,9 @@ const Sidebar = ({ setComponent }: SidebarProps) => {
             </div>
             {/* Navigation */}
             <nav className="flex-1 flex flex-col gap-1">
-                {navLinks.map(({ label, icon: Icon, key  }) => {
+                {navLinks.map(({ label, icon: Icon, key }) => {
                     const isSelected = selectedComponent === key;
-                    
+
                     return (
                         <Button
                             key={label}
@@ -165,7 +165,7 @@ const Sidebar = ({ setComponent }: SidebarProps) => {
             </nav>
             {/* Tip */}
             <div className="mt-auto text-sm text-muted-foreground bg-gradient-to-r dark:from-[#1F1F1F] dark:to-[#20010F] from-[#FDF2F8] to-[#FAF5FF] rounded-md p-3">
-                Tip: Take care of your portfolio to increase your chances <span role="img" aria-label="rocket">🚀</span>
+                Dica: Cuide do seu portfólio para aumentar suas chances <span role="img" aria-label="rocket">🚀</span>
             </div>
         </aside>
     );

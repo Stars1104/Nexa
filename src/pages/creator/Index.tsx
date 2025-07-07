@@ -6,18 +6,31 @@ import { useIsMobile } from "../../hooks/use-mobile";
 import { CreatorProfile } from "../../components/creator/CreatorProfile";
 import { useState } from "react";
 import NotFound from "../NotFound";
+import ProjectDetail from "../../components/creator/ProjectDetail";
+import MyApplication from "../../components/creator/MyApplication";
+import Chat from "../../components/Chat";
+import Portfolio from "../../components/creator/Portfolio";
 
 const Index = () => {
     const isMobile = useIsMobile();
 
-    const [component, setComponent] = useState<string | null>("dashboard");
+    const [component, setComponent] = useState<string | null>("Painel");
+    const [projectId, setProjectId] = useState<number | null>(null);
 
     const CreatorComponent = () => {
         switch (component) {
-            case "dashboard":
-                return <Dashboard />;
-            case "my account":
+            case "Painel":
+                return <Dashboard setComponent={setComponent} setProjectId={setProjectId} />;
+            case "Minha Conta":
                 return <CreatorProfile />;
+            case "Detalhes do Projeto":
+                return <ProjectDetail setComponent={setComponent} projectId={projectId} />;
+            case "Minha Aplicação":
+                return <MyApplication />;
+            case "Chat":
+                return <Chat />;
+            case "Portfólio":
+                return <Portfolio />;
             default:
                 return <NotFound />;
         }
@@ -28,8 +41,8 @@ const Index = () => {
             <div className="flex h-screen bg-background text-foreground">
                 {!isMobile && <Sidebar setComponent={setComponent} />}
                 <div className="flex-1 flex flex-col min-w-0">
-                    <ComponentNavbar />
-                    <main className={`flex-1 overflow-y-auto bg-muted/50 ${isMobile ? 'pb-20' : ''}`}>
+                    <ComponentNavbar title={component} />
+                    <main className={`flex-1 overflow-y-auto bg-muted/50 ${isMobile ? 'md:pb-20' : ''} scrollbar-hide-mobile`}>
                         <CreatorComponent />
                     </main>
                 </div>

@@ -81,9 +81,9 @@ export const EditProfile: React.FC<{
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-[#171717] p-6">
+        <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] p-6">
             <form
-                className="w-full max-w-5xl mx-auto bg-background rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-6 mt-6"
+                className="w-full bg-background rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-6 mt-6"
                 onSubmit={handleSave}
             >
                 <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Edit Profile</h2>
