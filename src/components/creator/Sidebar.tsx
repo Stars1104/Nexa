@@ -1,5 +1,5 @@
 import { Button } from "../ui/button";
-import { Home, FileText, MessageCircle, User, Briefcase } from "lucide-react";
+import { Home, FileText, MessageCircle, User, Briefcase, Bell } from "lucide-react";
 import LightLogo from "../../assets/light-logo.png";
 import DarkLogo from "../../assets/dark-logo.png";
 import { useEffect, useState, useRef } from "react";
@@ -11,6 +11,7 @@ const navLinks = [
     { label: "Conversas", icon: MessageCircle, key: "Chat" },
     { label: "Minha Conta", icon: User, key: "Minha Conta" },
     { label: "Meu Portfólio", icon: Briefcase, key: "Portfólio" },
+    { label: "Notificações", icon: Bell, key: "Notificações" },
 ];
 
 interface SidebarProps {
@@ -67,7 +68,7 @@ const Sidebar = ({ setComponent }: SidebarProps) => {
         return (
             <button
                 aria-label="Abrir menu"
-                className="fixed top-4 left-3 z-50 p-1.5 rounded-md bg-background shadow-md border border-muted-foreground/10 text-lg text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
+                className="fixed top-4 left-3 z-0 p-1.5 rounded-md bg-background shadow-md border border-muted-foreground/10 text-lg text-muted-foreground hover:text-foreground focus:outline-none transition-colors"
                 onClick={() => setMobileSidebarOpen(true)}
             >
                 <span className="sr-only">Abrir menu</span>
@@ -78,7 +79,7 @@ const Sidebar = ({ setComponent }: SidebarProps) => {
 
     if (isMobile && isVisible) {
         return (
-            <div className="fixed inset-0 z-50 pointer-events-auto">
+            <div className="fixed inset-0 z-0 pointer-events-auto">
                 {/* Overlay */}
                 <div
                     className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ease-in-out ${mobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
@@ -86,7 +87,7 @@ const Sidebar = ({ setComponent }: SidebarProps) => {
                 />
                 {/* Sidebar */}
                 <aside
-                    className={`fixed top-0 left-0 h-full w-72 max-w-full bg-background flex flex-col shadow-2xl z-50
+                    className={`fixed top-0 left-0 h-full w-72 max-w-full bg-background flex flex-col shadow-2xl z-0
                         transition-transform transition-opacity duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]
                         ${mobileSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'}
                         pointer-events-auto`}

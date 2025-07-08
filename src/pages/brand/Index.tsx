@@ -6,18 +6,36 @@ import BrandSidebar from "../../components/brand/BrandSidebar";
 import BrandDashboard from "../../components/brand/BrandDashboard";
 import BrandProfile from "@/components/brand/BrandProfile";
 import NotFound from "../NotFound";
+import Chat from "@/components/Chat";
+import ViewCreators from "@/components/brand/ViewCreators";
+import ViewApplication from "@/components/brand/ViewApplication";
+import CreateCampaign from "@/components/brand/CreateCampaign";
+import Payment from "@/components/brand/Payment";
+import Notification from "@/components/Notification";
 
 const Index = () => {
     const isMobile = useIsMobile();
 
-    const [component, setComponent] = useState<string | null>("my campaigns");
+    const [component, setComponent] = useState<string | null>("Minhas campanhas");
 
     const CreatorComponent = () => {
         switch (component) {
-            case "my campaigns":
-                return <BrandDashboard />;
-            case "my account":
+            case "Minhas campanhas":
+                return <BrandDashboard setComponent={setComponent} />;
+            case "Meu perfil":
                 return <BrandProfile />;
+            case "Chat":
+                return <Chat />
+            case "Ver criadores":
+                return <ViewCreators setComponent={setComponent} />
+            case "Ver aplicação":
+                return <ViewApplication setComponent={setComponent} />
+            case "Nova campanha":
+                return <CreateCampaign />
+            case "Pagamentos":
+                return <Payment />
+            case "Notificações":
+                return <Notification />
             default:
                 return <NotFound />;
         }

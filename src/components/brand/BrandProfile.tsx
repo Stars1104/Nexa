@@ -81,9 +81,9 @@ export default function BrandProfile() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#171717] py-10 px-2 md:px-0 flex flex-col items-center">
-      <div className="w-full max-w-5xl">
-        <h1 className="text-2xl md:text-3xl font-bold mb-1">My Profile</h1>
-        <p className="text-muted-foreground mb-8">Manage your profile and brand information</p>
+      <div className="w-full max-w-full px-10">
+        <h1 className="text-2xl md:text-3xl font-bold mb-1">Meu Perfil</h1>
+        <p className="text-muted-foreground mb-8">Gerencie seu perfil e informações da marca</p>
         <Card className="p-6 md:p-10">
           <CardContent className="p-0">
             {/* Profile Header */}
@@ -123,7 +123,7 @@ export default function BrandProfile() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               {/* Brand Name */}
               <div>
-                <Label htmlFor="brandName" className="mb-1 block">Brand Name</Label>
+                <Label htmlFor="brandName" className="mb-1 block">Nome completo</Label>
                 <div className="relative flex items-center">
                   <User className="absolute left-3 text-muted-foreground w-5 h-5" />
                   {editField === "brandName" ? (
@@ -152,7 +152,7 @@ export default function BrandProfile() {
               </div>
               {/* Email */}
               <div>
-                <Label htmlFor="email" className="mb-1 block">Email</Label>
+                <Label htmlFor="email" className="mb-1 block">E-mail</Label>
                 <div className="relative flex items-center">
                   <Mail className="absolute left-3 text-muted-foreground w-5 h-5" />
                   {editField === "email" ? (
@@ -181,7 +181,7 @@ export default function BrandProfile() {
               </div>
               {/* Company Name */}
               <div>
-                <Label htmlFor="companyName" className="mb-1 block">Company Name</Label>
+                <Label htmlFor="companyName" className="mb-1 block">Nome da empresa</Label>
                 <div className="relative flex items-center">
                   <Building2 className="absolute left-3 text-muted-foreground w-5 h-5" />
                   {editField === "companyName" ? (
@@ -240,7 +240,7 @@ export default function BrandProfile() {
             </div>
             {/* Brand Description */}
             <div className="mb-6">
-              <Label htmlFor="description" className="mb-1 block">Brand Description</Label>
+              <Label htmlFor="description" className="mb-1 block">Descrição da marca</Label>
               <div className="relative flex items-center">
                 {editField === "description" ? (
                   <Textarea
@@ -269,8 +269,8 @@ export default function BrandProfile() {
             {/* Edit Actions */}
             {editField && (
               <div className="flex gap-2 mb-6">
-                <Button variant="secondary" onClick={handleSave}>Save</Button>
-                <Button variant="ghost" onClick={handleCancel}>Cancel</Button>
+                <Button variant="secondary" onClick={handleSave}>Salvar</Button>
+                <Button variant="ghost" onClick={handleCancel}>Cancelar</Button>
               </div>
             )}
             {/* Password Change Tag/Button */}
@@ -282,17 +282,17 @@ export default function BrandProfile() {
                     className="flex items-center gap-2 border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/30 border-2"
                   >
                     <KeyRound className="w-4 h-4" />
-                    Change Password
+                    Alterar a senha
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Change Password</DialogTitle>
-                    <DialogDescription>Update your account password below.</DialogDescription>
+                    <DialogTitle>Alterar a senha</DialogTitle>
+                    <DialogDescription>Atualize a senha da sua conta abaixo.</DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handlePasswordSubmit} className="space-y-4">
                     <div>
-                      <Label htmlFor="old">Current Password</Label>
+                      <Label htmlFor="old">Senha atual</Label>
                       <Input
                         id="old"
                         name="old"
@@ -304,7 +304,7 @@ export default function BrandProfile() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="new">New Password</Label>
+                      <Label htmlFor="new">Nova Senha</Label>
                       <Input
                         id="new"
                         name="new"
@@ -316,7 +316,7 @@ export default function BrandProfile() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="confirm">Confirm New Password</Label>
+                      <Label htmlFor="confirm">Confirmar nova senha</Label>
                       <Input
                         id="confirm"
                         name="confirm"
@@ -328,9 +328,9 @@ export default function BrandProfile() {
                       />
                     </div>
                     <DialogFooter>
-                      <Button type="submit" variant="secondary">Update Password</Button>
+                      <Button type="submit" variant="secondary">Atualizar senha</Button>
                       <DialogClose asChild>
-                        <Button type="button" variant="ghost">Cancel</Button>
+                        <Button type="button" variant="ghost">Cancelar</Button>
                       </DialogClose>
                     </DialogFooter>
                   </form>

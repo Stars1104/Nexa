@@ -10,6 +10,7 @@ import ProjectDetail from "../../components/creator/ProjectDetail";
 import MyApplication from "../../components/creator/MyApplication";
 import Chat from "../../components/Chat";
 import Portfolio from "../../components/creator/Portfolio";
+import Notification from "@/components/Notification";
 
 const Index = () => {
     const isMobile = useIsMobile();
@@ -31,6 +32,8 @@ const Index = () => {
                 return <Chat />;
             case "Portfólio":
                 return <Portfolio />;
+            case "Notificações":
+                return <Notification />
             default:
                 return <NotFound />;
         }

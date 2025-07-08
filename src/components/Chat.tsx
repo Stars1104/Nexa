@@ -183,8 +183,8 @@ export default function Chat() {
                         "flex flex-col w-full max-w-sm border-r bg-background transition-all duration-300 ease-in-out",
                         "md:relative md:translate-x-0 md:shadow-none",
                         sidebarOpen
-                            ? "fixed inset-0 z-50 translate-x-0 shadow-2xl"
-                            : "fixed inset-0 z-50 -translate-x-full md:relative md:translate-x-0"
+                            ? "fixed inset-0 z-0 translate-x-0 shadow-2xl"
+                            : "fixed inset-0 z-0 -translate-x-full md:relative md:translate-x-0"
                     )}
                 >
                     {/* Sidebar Header */}
@@ -381,7 +381,7 @@ export default function Chat() {
             {/* Mobile Overlay */}
             {sidebarOpen && (
                 <div
-                    className="md:hidden fixed inset-0 bg-black/30 z-40 backdrop-blur-sm"
+                    className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}

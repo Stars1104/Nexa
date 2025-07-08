@@ -40,7 +40,7 @@ export const Navbar = () => {
     );
 
     return (
-        <header className="relative z-10 p-4 md:p-6">
+        <header className="relative z-0 p-4 md:p-6">
             <div className="max-w-7xl mx-auto flex justify-between items-center">
                 <div className="text-xl md:text-2xl font-bold text-foreground">
                     {

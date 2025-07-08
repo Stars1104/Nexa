@@ -1,5 +1,5 @@
 import React from "react";
-
+import { MessageCircle } from "lucide-react";                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
 const applications = [
   {
     campaign: "Resenha Fone de Ouvido",
@@ -57,7 +57,6 @@ const MyApplication: React.FC = () => {
                 <th className="px-6 py-4 font-semibold">Campanha</th>
                 <th className="px-6 py-4 font-semibold">Marca</th>
                 <th className="px-6 py-4 font-semibold">Valor</th>
-                <th className="px-6 py-4 font-semibold">Tipo</th>
                 <th className="px-6 py-4 font-semibold">Prazo</th>
                 <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold">Ações</th>
@@ -72,7 +71,6 @@ const MyApplication: React.FC = () => {
                   <td className="px-6 py-4 text-gray-900 dark:text-gray-100 whitespace-nowrap">{app.campaign}</td>
                   <td className="px-6 py-4 text-indigo-500 dark:text-indigo-300 whitespace-nowrap">{app.brand}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{app.value}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">{app.type}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{app.deadline}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusStyles[app.statusType]}`}>{app.status}</span>
@@ -83,6 +81,7 @@ const MyApplication: React.FC = () => {
                         href={app.action.link}
                         className="text-pink-500 hover:underline font-medium"
                       >
+                        <MessageCircle className="w-4 h-4 mr-2" />
                         {app.action.label}
                       </a>
                     ) : (
