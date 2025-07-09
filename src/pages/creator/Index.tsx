@@ -11,6 +11,7 @@ import MyApplication from "../../components/creator/MyApplication";
 import Chat from "../../components/Chat";
 import Portfolio from "../../components/creator/Portfolio";
 import Notification from "@/components/Notification";
+import Subscription from "@/components/creator/Subscription";
 
 const Index = () => {
     const isMobile = useIsMobile();
@@ -27,13 +28,15 @@ const Index = () => {
             case "Detalhes do Projeto":
                 return <ProjectDetail setComponent={setComponent} projectId={projectId} />;
             case "Minha Aplicação":
-                return <MyApplication />;
+                return <MyApplication setComponent={setComponent} />;
             case "Chat":
                 return <Chat />;
             case "Portfólio":
                 return <Portfolio />;
             case "Notificações":
                 return <Notification />
+            case "Subscrição":
+                return <Subscription />
             default:
                 return <NotFound />;
         }
@@ -42,14 +45,14 @@ const Index = () => {
     return (
         <ThemeProvider>
             <div className="flex h-screen bg-background text-foreground">
-                {!isMobile && <Sidebar setComponent={setComponent} />}
+                {!isMobile && <Sidebar setComponent={setComponent} component={component} />}
                 <div className="flex-1 flex flex-col min-w-0">
                     <ComponentNavbar title={component} />
                     <main className={`flex-1 overflow-y-auto bg-muted/50 ${isMobile ? 'md:pb-20' : ''} scrollbar-hide-mobile`}>
                         <CreatorComponent />
                     </main>
                 </div>
-                {isMobile && <Sidebar setComponent={setComponent} />}
+                {isMobile && <Sidebar setComponent={setComponent} component={component} />}
             </div>
         </ThemeProvider>
     );

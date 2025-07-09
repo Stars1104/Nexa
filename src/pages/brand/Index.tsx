@@ -44,14 +44,14 @@ const Index = () => {
     return (
         <ThemeProvider>
             <div className="flex h-screen bg-background text-foreground">
-                {!isMobile && <BrandSidebar setComponent={setComponent} />}
+                {!isMobile && <BrandSidebar setComponent={setComponent} component={component} />}
                 <div className="flex-1 flex flex-col min-w-0">
                     <ComponentNavbar title={component || "Dashboard"} />
                     <main className={`flex-1 overflow-y-auto bg-muted/50 ${isMobile ? 'pb-20' : ''}`}>
                         <CreatorComponent />
                     </main>
                 </div>
-                {isMobile && <BrandSidebar setComponent={setComponent} />}
+                {isMobile && <BrandSidebar setComponent={setComponent} component={component} />}
             </div>
         </ThemeProvider>
     );

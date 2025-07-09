@@ -1,5 +1,5 @@
-import React from "react";
-import { MessageCircle } from "lucide-react";                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+import React, { useState } from "react";
+
 const applications = [
   {
     campaign: "Resenha Fone de Ouvido",
@@ -42,7 +42,16 @@ const statusStyles = {
     "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300",
 };
 
-const MyApplication: React.FC = () => {
+interface MyApplicationProps {  
+  setComponent: (component: string) => void;
+}
+
+const MyApplication: React.FC<MyApplicationProps> = ({ setComponent }) => {
+
+  const handleComponent = (component: string) => {
+    setComponent(component);
+  }
+
   return (
     <div className="p-4 sm:p-8 bg-gray-50 dark:bg-neutral-900 min-h-[92vh]">
       <h2 className="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">
@@ -77,20 +86,19 @@ const MyApplication: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {app.action.type === "chat" ? (
-                      <a
-                        href={app.action.link}
+                      <button
                         className="text-pink-500 hover:underline font-medium"
+                        onClick={() => handleComponent("Chat")}
                       >
-                        <MessageCircle className="w-4 h-4 mr-2" />
                         {app.action.label}
-                      </a>
+                      </button>
                     ) : (
-                      <a
-                        href={app.action.link}
+                      <button
                         className="text-gray-700 dark:text-gray-200 hover:underline font-medium"
+                        onClick={() => handleComponent("Detalhes do Projeto")}
                       >
                         {app.action.label}
-                      </a>
+                      </button>
                     )}
                   </td>
                 </tr>

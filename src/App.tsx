@@ -14,6 +14,7 @@ import Signup from "./pages/auth/CreatorSignUp";
 import StudentVerify from "./pages/auth/StudentVerify";
 import CreatorIndex from "./pages/creator/Index";
 import BrandIndex from "./pages/brand/Index";
+import AdminIndex from "./pages/admin";
 
 const queryClient = new QueryClient();
 
@@ -31,8 +32,10 @@ const App = () => (
               <Route path="/signup/:role" element={<Signup />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/student-verify" element={<StudentVerify />} />
-              <Route path="/creator/:component" element={<CreatorIndex />} />
-              <Route path="/brand/:component" element={<BrandIndex />} />
+              <Route path="/creator" element={<CreatorIndex />} />
+              <Route path="/brand" element={<BrandIndex />} />
+              <Route path="/admin" element={<AdminIndex />} />  
+              
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

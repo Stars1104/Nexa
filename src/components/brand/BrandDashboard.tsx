@@ -116,11 +116,11 @@ const BrandDashboard: React.FC<BrandDashboardProps> = ({ setComponent }) => {
                                 </svg>
                                 Ver aplicativos
                             </button>
-                            <button className="flex-1 bg-[#E91E63] text-white font-medium rounded-lg py-2 transition hover:bg-[#E91E63]" onClick={() => setComponent("Ver criadores")}>
+                            <button className="flex-1 bg-[#E91E63] text-white font-medium rounded-lg py-2 transition hover:bg-[#E91E63]" onClick={() => setComponent("Chat")}>
                                 <svg className="inline mr-2" width="18" height="18" fill="none" viewBox="0 0 24 24">
                                     <path stroke="currentColor" strokeWidth="2" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z" />
                                 </svg>
-                                Ver criadores
+                                Chat
                             </button>
                         </div>
                     </div>

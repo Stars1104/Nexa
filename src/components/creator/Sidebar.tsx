@@ -1,5 +1,5 @@
 import { Button } from "../ui/button";
-import { Home, FileText, MessageCircle, User, Briefcase, Bell } from "lucide-react";
+import { Home, FileText, MessageCircle, User, Briefcase, Bell, CreditCard } from "lucide-react";
 import LightLogo from "../../assets/light-logo.png";
 import DarkLogo from "../../assets/dark-logo.png";
 import { useEffect, useState, useRef } from "react";
@@ -12,15 +12,17 @@ const navLinks = [
     { label: "Minha Conta", icon: User, key: "Minha Conta" },
     { label: "Meu Portfólio", icon: Briefcase, key: "Portfólio" },
     { label: "Notificações", icon: Bell, key: "Notificações" },
+    { label: "Subscrição", icon: CreditCard, key: "Subscrição" }
 ];
 
 interface SidebarProps {
     setComponent: (component: string) => void;
+    component?: string;
 }
 
-const Sidebar = ({ setComponent }: SidebarProps) => {
+const Sidebar = ({ setComponent, component }: SidebarProps) => {
     const [isDarkMode, setIsDarkMode] = useState(false);
-    const [selectedComponent, setSelectedComponent] = useState("dashboard");
+    const [selectedComponent, setSelectedComponent] = useState(component || "Painel");
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
     const closeTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -46,6 +48,8 @@ const Sidebar = ({ setComponent }: SidebarProps) => {
 
     // Handle mounting/unmounting for animation
     useEffect(() => {
+        setSelectedComponent(component);
+
         if (mobileSidebarOpen) {
             setIsVisible(true);
             if (closeTimeout.current) clearTimeout(closeTimeout.current);
@@ -55,7 +59,8 @@ const Sidebar = ({ setComponent }: SidebarProps) => {
         return () => {
             if (closeTimeout.current) clearTimeout(closeTimeout.current);
         };
-    }, [mobileSidebarOpen]);
+
+    }, [mobileSidebarOpen, component]);
 
     const handleCreatorComponent = (component: string) => {
         setSelectedComponent(component);

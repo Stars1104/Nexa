@@ -1,17 +1,17 @@
 import { Button } from "../ui/button";
-import { Home, FileText, MessageCircle, User, BanknoteIcon, Bell } from "lucide-react";
+import { Home, FileText, User, Briefcase, Text, Bell } from "lucide-react";
 import LightLogo from "../../assets/light-logo.png";
 import DarkLogo from "../../assets/dark-logo.png";
 import { useEffect, useState, useRef } from "react";
 import { useIsMobile } from "../../hooks/use-mobile";
 
 const navLinks = [
-    { label: "Minhas Campanhas", icon: Home, key: "Minhas campanhas" },
-    { label: "Nova campanha criada", icon: FileText, key: "Nova campanha" },
-    { label: "Chat", icon: MessageCircle, key: "Chat" },
-    { label: "Meu Perfil", icon: User, key: "Meu perfil" },
-    { label: "Pagamentos", icon: BanknoteIcon, key: "Pagamentos" },
-    { label: "Notificações", icon: Bell, key: "Notificações" },
+    { label: "Painel", icon: Home, key: "Painel" },
+    { label: "Campanhas Pendentes", icon: FileText, key: "Campanhas Pendentes" },
+    { label: "Todas as Campanhas", icon: Text, key: "Todas as Campanhas" },
+    { label: "Usuários", icon: User, key: "Usuários" },
+    { label: "Configurações de Regras", icon: Briefcase, key: "Configurações de Regras" },
+    { label: "Notificações", icon: Bell, key: "Notificações" }
 ];
 
 interface SidebarProps {
@@ -21,7 +21,7 @@ interface SidebarProps {
 
 const Sidebar = ({ setComponent, component }: SidebarProps) => {
     const [isDarkMode, setIsDarkMode] = useState(false);
-    const [selectedComponent, setSelectedComponent] = useState(component || "Minhas campanhas");
+    const [selectedComponent, setSelectedComponent] = useState("Painel");
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
     const closeTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -47,7 +47,7 @@ const Sidebar = ({ setComponent, component }: SidebarProps) => {
 
     // Set default component on mount
     useEffect(() => {
-        setSelectedComponent(component || "Minhas campanhas");
+        setSelectedComponent(component || "Painel");
     }, [component, setSelectedComponent]);
 
     // Handle mounting/unmounting for animation
