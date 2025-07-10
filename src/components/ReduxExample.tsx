@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loginUser, logoutUser } from '../store/thunks/authThunks';
 import { updateProfile, updatePreferences } from '../store/slices/userSlice';
+import { togglePremium } from '../store/slices/authSlice';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
+import { Crown } from 'lucide-react';
 
 const ReduxExample: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -92,14 +94,32 @@ const ReduxExample: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <h3 className="font-medium">User Information:</h3>
-                <p>Name: {user.name}</p>
+                <div className="flex items-center gap-2">
+                  <span>Name: {user.name}</span>
+                  {user.isPremium && (
+                    <div className="flex items-center gap-1">
+                      <Crown className="w-4 h-4 text-yellow-500" />
+                      <span className="px-2 py-1 text-xs font-medium bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full">
+                        PRO
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <p>Email: {user.email}</p>
                 <p>Role: {user.role}</p>
+                <p>Premium: {user.isPremium ? 'Yes' : 'No'}</p>
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button onClick={handleUpdateProfile}>
                   Update Profile
+                </Button>
+                <Button 
+                  onClick={() => dispatch(togglePremium())} 
+                  variant="outline"
+                  className="border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+                >
+                  {user.isPremium ? 'Remove Premium' : 'Add Premium'}
                 </Button>
                 <Button onClick={handleLogout} variant="outline">
                   Logout

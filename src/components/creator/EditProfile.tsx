@@ -35,7 +35,8 @@ export const EditProfile: React.FC<{
     initialProfile?: typeof defaultProfile;
     onCancel: () => void;
     onSave: (profile: typeof defaultProfile) => void;
-}> = ({ initialProfile = defaultProfile, onCancel, onSave }) => {
+    isLoading?: boolean;
+}> = ({ initialProfile = defaultProfile, onCancel, onSave, isLoading = false }) => {
     const [profile, setProfile] = useState({ ...initialProfile });
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [categoryInput, setCategoryInput] = useState("");
@@ -72,8 +73,15 @@ export const EditProfile: React.FC<{
     };
 
     const handleLanguagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setProfile((p) => ({ ...p, languages: e.target.value.split(",").map((l) => l.trim()) }));
+        const languagesString = e.target.value;
+        const languagesArray = languagesString.split(",").map((l) => l.trim()).filter(l => l.length > 0);
+        setProfile((p) => ({ ...p, languages: languagesArray }));
     };
+
+    // Convert languages array to string for display
+    const languagesDisplay = Array.isArray(profile.languages) 
+        ? profile.languages.join(", ") 
+        : profile.languages || "";
 
     const handleSave = (e: React.FormEvent) => {
         e.preventDefault();
@@ -103,7 +111,8 @@ export const EditProfile: React.FC<{
                         )}
                         <button
                             type="button"
-                            className="absolute bottom-0 right-0 bg-[#E91E63] hover:bg-[#E91E63] text-white rounded-full p-2 shadow-md focus:outline-none"
+                            disabled={isLoading}
+                            className="absolute bottom-0 right-0 bg-[#E91E63] hover:bg-[#E91E63] disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-full p-2 shadow-md focus:outline-none"
                             onClick={() => fileInputRef.current?.click()}
                             aria-label="Upload profile picture"
                         >
@@ -112,7 +121,8 @@ export const EditProfile: React.FC<{
                         {imagePreview && (
                             <button
                                 type="button"
-                                className="absolute top-0 right-0 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-200 rounded-full p-1 focus:outline-none"
+                                disabled={isLoading}
+                                className="absolute top-0 right-0 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded-full p-1 focus:outline-none"
                                 onClick={handleRemoveImage}
                                 aria-label="Remove profile picture"
                             >
@@ -143,6 +153,7 @@ export const EditProfile: React.FC<{
                             placeholder="Enter your full name"
                             value={profile.name}
                             onChange={handleChange}
+                            disabled={isLoading}
                             required
                             autoComplete="name"
                         />
@@ -156,6 +167,7 @@ export const EditProfile: React.FC<{
                             placeholder="Enter your email"
                             value={profile.email}
                             onChange={handleChange}
+                            disabled={isLoading}
                             required
                             autoComplete="email"
                         />
@@ -169,6 +181,7 @@ export const EditProfile: React.FC<{
                             placeholder="Enter your state"
                             value={profile.state}
                             onChange={handleChange}
+                            disabled={isLoading}
                             required
                             autoComplete="state"
                         />
@@ -182,6 +195,7 @@ export const EditProfile: React.FC<{
                             placeholder="Enter your role"
                             value={profile.role}
                             onChange={handleChange}
+                            disabled={isLoading}
                             required
                             autoComplete="role"
                         />
@@ -193,9 +207,10 @@ export const EditProfile: React.FC<{
                             id="languages"
                             name="languages"
                             type="text"
-                            placeholder="Enter your spoken languages"
-                            value={profile.languages}
-                            onChange={handleChange}
+                            placeholder="e.g. English, Spanish, Portuguese"
+                            value={languagesDisplay}
+                            onChange={handleLanguagesChange}
+                            disabled={isLoading}
                             required
                             autoComplete="languages"
                         />
@@ -205,6 +220,7 @@ export const EditProfile: React.FC<{
                         <Select
                             value={profile.gender}
                             onValueChange={val => setProfile(p => ({ ...p, gender: val }))}
+                            disabled={isLoading}
                         >
                             <SelectTrigger className="bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md px-4 py-2 text-gray-900 dark:text-white outline-none placeholder-gray-400 dark:placeholder-gray-500 text-base">
                                 <SelectValue placeholder="Select gender" />
@@ -224,13 +240,18 @@ export const EditProfile: React.FC<{
                 <div className="flex gap-3 mt-8">
                     <button
                         type="submit"
-                        className="bg-[#E91E63] hover:bg-pink-600 text-white font-semibold px-6 py-2 rounded-md"
+                        disabled={isLoading}
+                        className="bg-[#E91E63] hover:bg-pink-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold px-6 py-2 rounded-md flex items-center gap-2"
                     >
-                        Save changes
+                        {isLoading && (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        )}
+                        {isLoading ? "Saving..." : "Save changes"}
                     </button>
                     <button
                         type="button"
-                        className="bg-white dark:bg-neutral-900 text-gray-700 dark:text-gray-200 px-6 py-2 rounded-md focus:outline-none"
+                        disabled={isLoading}
+                        className="bg-white dark:bg-neutral-900 text-gray-700 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-2 rounded-md focus:outline-none"
                         onClick={onCancel}
                     >
                         Cancel

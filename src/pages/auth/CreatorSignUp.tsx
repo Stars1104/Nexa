@@ -1,25 +1,50 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { useDispatch, useSelector } from "react-redux";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "../../components/ui/form";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/checkbox";
+import { Alert, AlertDescription } from "../../components/ui/alert";
 import LightLogo from "../../assets/light-logo.png";
 import DarkLogo from "../../assets/dark-logo.png";
 import { useTheme } from "../../components/ThemeProvider";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { useSystemTheme } from "../../hooks/use-system-theme";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { RootState, AppDispatch } from "../../store";
+import { signupUser, loginUser } from "../../store/thunks/authThunks";
+import { clearError } from "../../store/slices/authSlice";
+import { toast } from "sonner";
+
+interface SignUpFormData {
+  name: string;
+  email: string;
+  whatsapp: string;
+  password: string;
+  confirmPassword: string;
+  isStudent: boolean;
+}
+
+interface SignInFormData {
+  email: string;
+  password: string;
+}
 
 const CreatorSignUp = () => {
   const { theme } = useTheme();
   const systemTheme = useSystemTheme();
   const isDarkMode = theme === "dark" || (theme === "system" && systemTheme);
   const [authType, setAuthType] = useState("signup");
-  const { role } = useParams();
+  const { role } = useParams<{ role: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useDispatch<AppDispatch>();
+  const { loginType } = useParams<{ loginType: string }>();
+  
+  const { isSigningUp, isLoading, error, isAuthenticated, user } = useSelector((state: RootState) => state.auth);
 
-  const form = useForm({
+  const form = useForm<SignUpFormData>({
     defaultValues: {
       name: "",
       email: "",
@@ -30,6 +55,44 @@ const CreatorSignUp = () => {
     },
     mode: "onChange",
   });
+
+  useEffect(() => {
+    if (loginType === "login") setAuthType("signin");
+  }, [loginType])
+
+  // Effect to handle successful authentication
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.isStudent) {
+        navigate("/student-verify");
+      } else {
+        // Check if there's a redirect location from ProtectedRoute
+        const from = location.state?.from?.pathname || getDefaultDashboard(user.role);
+        navigate(from, { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, role, navigate, location]);
+
+  // Helper function to get default dashboard based on user role
+  const getDefaultDashboard = (userRole: string) => {
+    switch (userRole) {
+      case "creator":
+        return "/creator";
+      case "brand":
+        return "/brand";
+      case "admin":
+        return "/admin";
+      default:
+        return "/creator";
+    }
+  };
+
+  // Clear error when switching auth types
+  useEffect(() => {
+    if (error) {
+      dispatch(clearError());
+    }
+  }, [authType, dispatch]);
 
   // Reset form when switching auth types
   const handleAuthTypeChange = (newAuthType: string) => {
@@ -42,46 +105,52 @@ const CreatorSignUp = () => {
       confirmPassword: "",
       isStudent: false,
     });
+    if (error) {
+      dispatch(clearError());
+    }
   };
 
   // Sign up Function
-  const onSignUp = (data: any) => {
-    // Handle sign up logic here
-    // const user = {
-    //   name: data.name,
-    //   email: data.email,
-    //   whatsapp: data.whatsapp,
-    //   password: data.password,
-    //   isStudent: data.isStudent,
-    // }
+  const onSignUp = async (data: SignUpFormData) => {
+    try {
+      const signupData = {
+        name: data.name,
+        email: data.email,
+        whatsapp: data.whatsapp,
+        password: data.password,
+        password_confirmation: data.confirmPassword,
+        isStudent: data.isStudent,
+        role: (role as 'creator' | 'brand') || 'creator',
+      };
 
-    if (data.isStudent) {
-      navigate("/student-verify");
-    } else {
-      if (role === "creator") {
-        navigate("/creator/dashboard");
-      } else {
-        navigate("/brand/dashboard");
+      const response = await dispatch(signupUser(signupData)).unwrap();
+      if (response.user !== null) {
+        toast.success("Conta criada com sucesso!");
       }
+      // Navigation will be handled by useEffect after successful signup
+    } catch (error) {
+      // Error is handled by Redux state
+      console.error('Sign up error:', error);
     }
   };
 
   // Sign in Function
-  const onSignIn = (data: any) => {
-    // const user = {
-    //   name: data.name,
-    //   email: data.email,
-    //   whatsapp: data.whatsapp,
-    //   password: data.password,
-    //   isStudent: data.isStudent,
-    // }
+  const onSignIn = async (data: SignInFormData) => {
+    try {
+      const loginData = {
+        email: data.email,
+        password: data.password,
+      };
 
-    if (role === "brand") {
-      navigate("/brand/dashboard");
-    } else {
-      navigate("/creator/dashboard");
+      const response = await dispatch(loginUser(loginData)).unwrap();
+      if (response.user !== null) {
+        toast.success("Você fez login com sucesso.");
+        // Navigation will be handled by useEffect after successful login
+      }
+    } catch (error) {
+      // Error is handled by Redux state
+      console.error('Sign in error:', error);
     }
-
   };
 
   return (
@@ -102,12 +171,23 @@ const CreatorSignUp = () => {
         <p className="text-muted-foreground text-center text-base mb-2">
           {authType === "signup" ? "Crie sua conta para começar" : "Entre na sua conta"}
         </p>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert className="w-full border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
+            <AlertDescription className="text-red-600 dark:text-red-400">
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Account type toggle */}
         <div className="flex w-full mb-2 border border-[#E2E2E2] p-1 rounded-full">
           <button
             className={`flex-1 py-2 rounded-full text-base font-semibold transition-colors ${authType === "signup" ? "bg-[#E91E63] text-white" : "bg-background text-foreground"}`}
             onClick={() => handleAuthTypeChange("signup")}
             type="button"
+            disabled={isSigningUp || isLoading}
           >
             Cadastrar
           </button>
@@ -115,10 +195,12 @@ const CreatorSignUp = () => {
             className={`flex-1 py-2 rounded-full border-border text-base font-semibold transition-colors ${authType === "signin" ? "bg-[#E91E63] text-white" : "bg-background text-foreground"}`}
             onClick={() => handleAuthTypeChange("signin")}
             type="button"
+            disabled={isSigningUp || isLoading}
           >
             Entrar
           </button>
         </div>
+
         {authType === "signup" ? (
           <>
             <Form {...form}>
@@ -133,7 +215,7 @@ const CreatorSignUp = () => {
                       message: "Nome deve ter pelo menos 5 caracteres"
                     },
                     maxLength: {
-                      value: 15,
+                      value: 30,
                       message: "Nome deve ter menos de 15 caracteres"
                     },
                     pattern: {
@@ -145,7 +227,7 @@ const CreatorSignUp = () => {
                     <FormItem>
                       <FormLabel>Nome</FormLabel>
                       <FormControl>
-                        <Input placeholder="Seu nome" {...field} />
+                        <Input placeholder="Seu nome" {...field} disabled={isSigningUp} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -165,7 +247,7 @@ const CreatorSignUp = () => {
                     <FormItem>
                       <FormLabel>E-mail</FormLabel>
                       <FormControl>
-                        <Input placeholder="seu@email.com" type="email" {...field} />
+                        <Input placeholder="seu@email.com" type="email" {...field} disabled={isSigningUp} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -178,7 +260,7 @@ const CreatorSignUp = () => {
                     <FormItem>
                       <FormLabel>WhatsApp</FormLabel>
                       <FormControl>
-                        <Input placeholder="(00) 00000-0000" {...field} />
+                        <Input placeholder="(00) 00000-0000" {...field} disabled={isSigningUp} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -198,7 +280,7 @@ const CreatorSignUp = () => {
                     <FormItem>
                       <FormLabel>Senha</FormLabel>
                       <FormControl>
-                        <Input placeholder="Crie uma senha segura" type="password" {...field} />
+                        <Input placeholder="Crie uma senha segura" type="password" {...field} disabled={isSigningUp} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -218,33 +300,39 @@ const CreatorSignUp = () => {
                     <FormItem>
                       <FormLabel>Confirmar Senha</FormLabel>
                       <FormControl>
-                        <Input placeholder="Repita a senha" type="password" {...field} />
+                        <Input placeholder="Repita a senha" type="password" {...field} disabled={isSigningUp} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                {
-                  role === "creator" && (
-                    <FormField
-                      control={form.control}
-                      name="isStudent"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                          <FormControl>
-                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            Sou um estudante e quero verificar meu status
-                          </FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                  )
-                }
+                {role === "creator" && (
+                  <FormField
+                    control={form.control}
+                    name="isStudent"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox 
+                            checked={field.value} 
+                            onCheckedChange={field.onChange}
+                            disabled={isSigningUp}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          Sou um estudante e quero verificar meu status
+                        </FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                )}
 
-                <Button type="submit" className="w-full bg-[#E91E63] hover:bg-pink-600 text-white mt-2 rounded-full">
-                  Criar conta
+                <Button 
+                  type="submit" 
+                  className="w-full bg-[#E91E63] hover:bg-pink-600 text-white mt-2 rounded-full"
+                  disabled={isSigningUp}
+                >
+                  {isSigningUp ? "Criando conta..." : "Criar conta"}
                 </Button>
               </form>
             </Form>
@@ -257,6 +345,7 @@ const CreatorSignUp = () => {
               variant="outline"
               className="w-full flex items-center justify-center gap-2 py-2 text-base font-medium rounded-full"
               type="button"
+              disabled={isSigningUp}
             >
               <span className="inline-block align-middle">
                 {/* Google SVG icon */}
@@ -278,7 +367,12 @@ const CreatorSignUp = () => {
             </Button>
             <div className="text-center w-full mt-2 flex justify-center gap-2">
               <span className="text-muted-foreground">Já tem uma conta? </span>
-              <div onClick={() => handleAuthTypeChange("signin")} className="font-semibold text-pink-500 hover:underline cursor-pointer">Entrar</div>
+              <div 
+                onClick={() => handleAuthTypeChange("signin")} 
+                className="font-semibold text-pink-500 hover:underline cursor-pointer"
+              >
+                Entrar
+              </div>
             </div>
           </>
         ) : (
@@ -299,7 +393,7 @@ const CreatorSignUp = () => {
                     <FormItem>
                       <FormLabel>E-mail</FormLabel>
                       <FormControl>
-                        <Input placeholder="seu@email.com" type="email" {...field} />
+                        <Input placeholder="seu@email.com" type="email" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -315,7 +409,7 @@ const CreatorSignUp = () => {
                     <FormItem>
                       <FormLabel>Senha</FormLabel>
                       <FormControl>
-                        <Input placeholder="Digite sua senha" type="password" {...field} />
+                        <Input placeholder="Digite sua senha" type="password" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -323,13 +417,22 @@ const CreatorSignUp = () => {
                 />
                 <div className="flex justify-between items-center gap-2">
                   <div className="flex items-center gap-2">
-                    <Checkbox />
+                    <Checkbox disabled={isLoading} />
                     <span className="text-muted-foreground text-sm">Lembrar-me</span>
                   </div>
-                  <span className="font-bold text-[#E91E63] dark:text-[#E91E63] hover:underline cursor-pointer text-sm" onClick={() => navigate("/forgot-password")}>Esqueceu a senha?</span>
+                  <span 
+                    className="font-bold text-[#E91E63] dark:text-[#E91E63] hover:underline cursor-pointer text-sm" 
+                    onClick={() => navigate("/forgot-password")}
+                  >
+                    Esqueceu a senha?
+                  </span>
                 </div>
-                <Button type="submit" className="w-full bg-[#E91E63] hover:bg-pink-600 text-white mt-2 rounded-full">
-                  Entrar
+                <Button 
+                  type="submit" 
+                  className="w-full bg-[#E91E63] hover:bg-pink-600 text-white mt-2 rounded-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Entrando..." : "Entrar"}
                 </Button>
               </form>
             </Form>
@@ -342,6 +445,7 @@ const CreatorSignUp = () => {
               variant="outline"
               className="w-full flex items-center justify-center gap-2 py-2 text-base font-medium rounded-full"
               type="button"
+              disabled={isLoading}
             >
               <span className="inline-block align-middle">
                 {/* Google SVG icon */}
@@ -363,7 +467,12 @@ const CreatorSignUp = () => {
             </Button>
             <div className="text-center w-full mt-2 flex justify-center gap-2">
               <span className="text-muted-foreground">Não tem uma conta? </span>
-              <div onClick={() => handleAuthTypeChange("signup")} className="font-semibold text-pink-500 hover:underline cursor-pointer">Criar conta</div>
+              <div 
+                onClick={() => handleAuthTypeChange("signup")} 
+                className="font-semibold text-pink-500 hover:underline cursor-pointer"
+              >
+                Criar conta
+              </div>
             </div>
           </>
         )}

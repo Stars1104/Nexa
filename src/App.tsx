@@ -3,9 +3,9 @@ import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { Provider } from "react-redux";
 import { ThemeProvider } from "./components/ThemeProvider";
-import { store } from "./store";
+import { useAuthRehydration } from "./hooks/useAuthRehydration";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AuthStep from "./pages/auth/AuthStep";
@@ -18,8 +18,11 @@ import AdminIndex from "./pages/admin";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <Provider store={store}>
+const App = () => {
+  // Initialize auth rehydration
+  useAuthRehydration();
+
+  return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="nexa-ui-theme">
         <TooltipProvider>
@@ -30,11 +33,28 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<AuthStep />} />
               <Route path="/signup/:role" element={<Signup />} />
+              <Route path="/auth/:loginType" element={<Signup />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/student-verify" element={<StudentVerify />} />
-              <Route path="/creator" element={<CreatorIndex />} />
-              <Route path="/brand" element={<BrandIndex />} />
-              <Route path="/admin" element={<AdminIndex />} />  
+              <Route path="/student-verify" element={
+                <ProtectedRoute>
+                  <StudentVerify />
+                </ProtectedRoute>
+              } />
+              <Route path="/creator" element={
+                <ProtectedRoute>
+                  <CreatorIndex />
+                </ProtectedRoute>
+              } />
+              <Route path="/brand" element={
+                <ProtectedRoute>
+                  <BrandIndex />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <ProtectedRoute>
+                  <AdminIndex />
+                </ProtectedRoute>
+              } />
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
@@ -43,7 +63,7 @@ const App = () => (
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
-  </Provider>
-);
+  );
+};
 
 export default App;

@@ -8,6 +8,11 @@ interface UserProfile {
   bio?: string;
   location?: string;
   website?: string;
+  role?: string;
+  languages?: string[];
+  gender?: string;
+  categories?: string[];
+  has_premium?: boolean;
   socialLinks?: {
     twitter?: string;
     instagram?: string;
@@ -58,6 +63,18 @@ const userSlice = createSlice({
         state.profile = { ...state.profile, ...action.payload };
       }
     },
+    updateProfileStart: (state) => {
+      state.isLoading = true;
+      state.error = null;
+    },
+    updateProfileSuccess: (state, action: PayloadAction<UserProfile>) => {
+      state.isLoading = false;
+      state.profile = action.payload;
+    },
+    updateProfileFailure: (state, action: PayloadAction<string>) => {
+      state.isLoading = false;
+      state.error = action.payload;
+    },
     updatePreferences: (state, action: PayloadAction<Partial<UserState['preferences']>>) => {
       state.preferences = { ...state.preferences, ...action.payload };
     },
@@ -72,6 +89,9 @@ export const {
   fetchProfileSuccess,
   fetchProfileFailure,
   updateProfile,
+  updateProfileStart,
+  updateProfileSuccess,
+  updateProfileFailure,
   updatePreferences,
   clearUserError,
 } = userSlice.actions;

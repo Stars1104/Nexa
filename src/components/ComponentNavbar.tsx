@@ -1,11 +1,14 @@
 import { ThemeToggle } from "./ThemeToggle";
-import { Avatar, AvatarFallback } from "./ui/avatar";
-import { Bell } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Bell, ChevronDown, LogOut, User } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Separator } from "./ui/separator";
 import ReactDOM from "react-dom";
+import { useAppSelector, useAppDispatch } from "../store/hooks";
+import { logoutUser } from "../store/thunks/authThunks";
+import { useNavigate } from "react-router-dom";
 
 interface CreatorNavbarProps {
   title: string;
@@ -13,21 +16,60 @@ interface CreatorNavbarProps {
 
 const CreatorNavbar = ({ title }: CreatorNavbarProps) => {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  // Get user data from Redux store and dispatch
+  const { user } = useAppSelector((state) => state.auth);
+  const { profile } = useAppSelector((state) => state.user);
+  const dispatch = useAppDispatch();
 
-  // Close dropdown when clicking outside
+  // Use profile data if available, otherwise fall back to auth user data
+  const userData = profile || user;
+
+  // Handle logout
+  const handleLogout = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await dispatch(logoutUser()).unwrap();
+      setShowUserMenu(false);
+      navigate("/");
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
+  // Function to generate initials from name
+  const getInitials = (name: string): string => {
+    if (!name) return "U";
+    const names = name.trim().split(" ");
+    if (names.length === 1) {
+      return names[0].charAt(0).toUpperCase();
+    }
+    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
+  };
+
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
       }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    if (showNotifications || showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [showNotifications, showUserMenu]);
 
   // Mock notification data
   const notifications = [
@@ -125,14 +167,61 @@ const CreatorNavbar = ({ title }: CreatorNavbarProps) => {
           )}
         </div>
         <ThemeToggle />
-        <div className="flex items-center gap-2">
-          <Avatar className="w-8 h-8 sm:w-10 sm:h-10">
-            <AvatarFallback className="text-sm sm:text-base">LC</AvatarFallback>
-          </Avatar>
-          <div className="hidden md:flex flex-col text-right">
-            <span className="font-medium leading-none">Luiza Costa</span>
-            <span className="text-xs text-muted-foreground">Content Creator</span>
-          </div>
+        <div className="flex items-center gap-2 relative" ref={userMenuRef}>
+          <button
+            className="flex items-center gap-2 p-2 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
+            onClick={() => setShowUserMenu(!showUserMenu)}
+          >
+            <Avatar className="w-8 h-8 sm:w-10 sm:h-10">
+              {(userData as any)?.avatar ? (
+                <AvatarImage src={(userData as any).avatar} alt={userData.name} />
+              ) : null}
+              <AvatarFallback className="text-sm sm:text-base text-start">
+                {userData?.name ? getInitials(userData.name) : "U"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="hidden md:flex flex-col text-start">
+              <span className="font-medium leading-none">
+                {userData?.name || "User"}
+              </span>
+            </div>
+            <ChevronDown className="w-4 h-4 hidden sm:block" />
+          </button>
+
+          {/* User Dropdown Menu */}
+          {showUserMenu && (
+            <div className="absolute right-0 top-full mt-2 w-64 bg-background border rounded-lg shadow-lg z-50 dark:bg-[#171717]">
+              <Card>
+                <CardContent className="p-0">
+                  <div className="p-4 border-b">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-12 h-12">
+                        {(userData as any)?.avatar ? (
+                          <AvatarImage src={(userData as any).avatar} alt={userData.name} />
+                        ) : null}
+                        <AvatarFallback className="text-base">
+                          {userData?.name ? getInitials(userData.name) : "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-sm">{userData?.name || "User"}</h3>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="py-2">
+                    <button
+                      type="button"
+                      className="flex items-center gap-3 w-full p-3 hover:bg-accent/50 text-left transition-colors text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 cursor-pointer"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span className="text-sm">Logout</span>
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       </div>
     </nav>

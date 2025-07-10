@@ -1,4 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useAppSelector, useAppDispatch } from "../../store/hooks";
+import { fetchUserProfile, updateUserProfile } from "../../store/thunks/userThunks";
+import { Crown } from "lucide-react";
+import { toast } from "sonner";
 import EditProfile from "./EditProfile";
 
 const getInitials = (name: string) => {
@@ -9,31 +13,94 @@ const getInitials = (name: string) => {
         .toUpperCase();
 };
 
+// Fallback profile data if no user data is available
 const defaultProfile = {
-    name: "Andrii Kerrn",
-    email: "andriikerrn@gmail.com",
-    state: "United States",
+    name: "User",
+    email: "user@example.com",
+    state: "Not specified",
     role: "Influencer",
-    languages: ["English", "Spanish"],
-    gender: "Male",
-    categories: ["Fashion", "Lifestyle", "Beauty"],
+    languages: ["English"],
+    gender: "Not specified",
+    categories: ["General"],
     image: null,
 };
 
 export const CreatorProfile = () => {
+    const dispatch = useAppDispatch();
     const [editMode, setEditMode] = useState(false);
-    const [profile, setProfile] = useState({ ...defaultProfile });
+    
+    // Get profile data from Redux store
+    const { profile, isLoading, error } = useAppSelector((state) => state.user);
+    const { user } = useAppSelector((state) => state.auth);
+
+    // Fetch profile data on component mount
+    useEffect(() => {
+        if (user && !profile) {
+            dispatch(fetchUserProfile());
+        }
+    }, [dispatch, user, profile]);
+
+    // Merge user data with profile data and fallback to defaults
+    const displayProfile = {
+        name: profile?.name || user?.name || defaultProfile.name,
+        email: profile?.email || user?.email || defaultProfile.email,
+        state: profile?.location || defaultProfile.state,
+        role: profile?.role || user?.role || defaultProfile.role,
+        languages: profile?.languages || defaultProfile.languages,
+        gender: profile?.gender || defaultProfile.gender,
+        categories: profile?.categories || defaultProfile.categories,
+        image: profile?.avatar || null,
+        has_premium: profile?.has_premium || false,
+    };
+
+    const handleSaveProfile = async (updatedProfile: any) => {
+        try {
+            // Map form data to API format
+            const profileData = {
+                name: updatedProfile.name,
+                email: updatedProfile.email,
+                location: updatedProfile.state, // Map state to location
+                role: updatedProfile.role,
+                languages: Array.isArray(updatedProfile.languages) 
+                    ? updatedProfile.languages 
+                    : updatedProfile.languages?.split(',').map((l: string) => l.trim()),
+                gender: updatedProfile.gender,
+                categories: updatedProfile.categories,
+                image: updatedProfile.image, // File object if uploaded
+            };
+
+            await dispatch(updateUserProfile(profileData)).unwrap();
+            toast.success("Profile updated successfully!");
+            setEditMode(false);
+        } catch (error: any) {
+            toast.error(error || "Failed to update profile");
+        }
+    };
 
     if (editMode) {
         return (
             <EditProfile
-                initialProfile={profile}
+                initialProfile={displayProfile}
                 onCancel={() => setEditMode(false)}
-                onSave={(updated) => {
-                    setProfile(updated);
-                    setEditMode(false);
-                }}
+                onSave={handleSaveProfile}
+                isLoading={isLoading}
             />
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] p-6 flex items-center justify-center">
+                <div className="text-gray-500 dark:text-gray-400">Loading profile...</div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] p-6 flex items-center justify-center">
+                <div className="text-red-500">Error loading profile: {error}</div>
+            </div>
         );
     }
 
@@ -58,31 +125,54 @@ export const CreatorProfile = () => {
                     <div className="flex flex-col gap-8 items-start">
                         {/* Avatar and name */}
                         <div className="flex gap-4 items-center min-w-[120px]">
-                            <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-400 flex items-center justify-center text-2xl font-bold text-purple-600 dark:text-white mb-2">
-                                {getInitials(profile.name)}
+                            <div className="relative">
+                                <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-400 flex items-center justify-center text-2xl font-bold text-purple-600 dark:text-white mb-2">
+                                    {displayProfile.image ? (
+                                        <img 
+                                            src={displayProfile.image} 
+                                            alt="Profile" 
+                                            className="w-16 h-16 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        getInitials(displayProfile.name)
+                                    )}
+                                </div>
+                                {/* Premium Icon */}
+                                {displayProfile.has_premium && (
+                                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800">
+                                        <Crown className="w-3 h-3 text-white" />
+                                    </div>
+                                )}
                             </div>
                             <div>
-                                <div className="text-base font-semibold text-gray-900 dark:text-white">{profile.name}</div>
-                                <div className="text-sm text-gray-500 dark:text-gray-300">{profile.email}</div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-base font-semibold text-gray-900 dark:text-white">{displayProfile.name}</span>
+                                    {user?.isPremium && (
+                                        <span className="px-2 py-1 text-xs font-medium bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full">
+                                            PRO
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-sm text-gray-500 dark:text-gray-300">{displayProfile.email}</div>
                             </div>
                         </div>
                         {/* Info grid */}
                         <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-sm mt-2">
                             <div>
                                 <div className="text-gray-400 dark:text-gray-400">Estado</div>
-                                <div className="text-gray-900 dark:text-white">{profile.state}</div>
+                                <div className="text-gray-900 dark:text-white">{displayProfile.state}</div>
                             </div>
                             <div>
                                 <div className="text-gray-400 dark:text-gray-400">Role</div>
-                                <div className="text-gray-900 dark:text-white">{profile.role}</div>
+                                <div className="text-gray-900 dark:text-white">{displayProfile.role}</div>
                             </div>
                             <div>
                                 <div className="text-gray-400 dark:text-gray-400">Línguas faladas</div>
-                                <div className="text-gray-900 dark:text-white">{profile.languages.join(", ")}</div>
+                                <div className="text-gray-900 dark:text-white">{displayProfile.languages.join(", ")}</div>
                             </div>
                             <div>
                                 <div className="text-gray-400 dark:text-gray-400">Gênero</div>
-                                <div className="text-gray-900 dark:text-white">{profile.gender}</div>
+                                <div className="text-gray-900 dark:text-white">{displayProfile.gender}</div>
                             </div>
                         </div>
                     </div>

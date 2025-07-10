@@ -18,46 +18,53 @@ src/store/
 ## Key Concepts
 
 ### 1. Store
+
 The main Redux store is configured in `src/store/index.ts` and wrapped around the app in `App.tsx`.
 
 ### 2. Slices
+
 Slices contain the state logic and reducers for specific features:
+
 - `authSlice`: Manages authentication state (user, token, loading, errors)
 - `userSlice`: Manages user profile and preferences
 
 ### 3. Hooks
+
 Use the typed hooks from `src/store/hooks.ts`:
+
 - `useAppDispatch()`: For dispatching actions
 - `useAppSelector()`: For selecting state
 
 ### 4. Async Thunks
+
 For API calls and async operations, use `createAsyncThunk`:
+
 - `loginUser`: Handles login API calls
 - `logoutUser`: Handles logout
 
 ## Usage Examples
 
 ### Reading State
+
 ```tsx
-import { useAppSelector } from '../store/hooks';
+import { useAppSelector } from "../store/hooks";
 
 const MyComponent = () => {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { profile } = useAppSelector((state) => state.user);
-  
+
   return (
-    <div>
-      {isAuthenticated ? `Welcome, ${user?.name}` : 'Please login'}
-    </div>
+    <div>{isAuthenticated ? `Welcome, ${user?.name}` : "Please login"}</div>
   );
 };
 ```
 
 ### Dispatching Actions
+
 ```tsx
-import { useAppDispatch } from '../store/hooks';
-import { loginUser } from '../store/thunks/authThunks';
-import { updateProfile } from '../store/slices/userSlice';
+import { useAppDispatch } from "../store/hooks";
+import { loginUser } from "../store/thunks/authThunks";
+import { updateProfile } from "../store/slices/userSlice";
 
 const MyComponent = () => {
   const dispatch = useAppDispatch();
@@ -72,14 +79,15 @@ const MyComponent = () => {
   };
 
   const handleUpdateProfile = () => {
-    dispatch(updateProfile({ name: 'New Name' }));
+    dispatch(updateProfile({ name: "New Name" }));
   };
 };
 ```
 
 ### Creating New Slices
+
 ```tsx
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface MyState {
   data: any[];
@@ -94,7 +102,7 @@ const initialState: MyState = {
 };
 
 const mySlice = createSlice({
-  name: 'myFeature',
+  name: "myFeature",
   initialState,
   reducers: {
     setLoading: (state, action: PayloadAction<boolean>) => {
@@ -114,20 +122,21 @@ export default mySlice.reducer;
 ```
 
 ### Creating Async Thunks
+
 ```tsx
-import { createAsyncThunk } from '@reduxjs/toolkit';
+import { createAsyncThunk } from "@reduxjs/toolkit";
 
 export const fetchData = createAsyncThunk(
-  'myFeature/fetchData',
+  "myFeature/fetchData",
   async (_, { dispatch }) => {
     try {
       dispatch(setLoading(true));
-      const response = await fetch('/api/data');
+      const response = await fetch("/api/data");
       const data = await response.json();
       dispatch(setData(data));
       return data;
     } catch (error) {
-      dispatch(setError('Failed to fetch data'));
+      dispatch(setError("Failed to fetch data"));
       throw error;
     } finally {
       dispatch(setLoading(false));
@@ -148,6 +157,7 @@ export const fetchData = createAsyncThunk(
 ## Redux DevTools
 
 Install the Redux DevTools browser extension to:
+
 - Inspect state changes
 - Time-travel debugging
 - Action replay
@@ -158,6 +168,7 @@ The DevTools are automatically enabled in development mode.
 ## Migration from Other State Management
 
 If you're migrating from React Query or other state management:
+
 1. Keep React Query for server state (API data)
 2. Use Redux for client state (UI state, user preferences, etc.)
-3. Consider using RTK Query for API state management if needed 
+3. Consider using RTK Query for API state management if needed
