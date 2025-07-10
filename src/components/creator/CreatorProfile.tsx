@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import { fetchUserProfile, updateUserProfile } from "../../store/thunks/userThunks";
-import { Crown } from "lucide-react";
+import { updateUserPassword } from "../../store/thunks/authThunks";
+import { Crown, Key } from "lucide-react";
 import { toast } from "sonner";
 import EditProfile from "./EditProfile";
+import UpdatePasswordModal from "../ui/UpdatePasswordModal";
 
 const getInitials = (name: string) => {
     return name
@@ -28,6 +30,8 @@ const defaultProfile = {
 export const CreatorProfile = () => {
     const dispatch = useAppDispatch();
     const [editMode, setEditMode] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [isPasswordLoading, setIsPasswordLoading] = useState(false);
     
     // Get profile data from Redux store
     const { profile, isLoading, error } = useAppSelector((state) => state.user);
@@ -77,6 +81,29 @@ export const CreatorProfile = () => {
         }
     };
 
+    const handleUpdatePassword = async (passwordData: { currentPassword: string; newPassword: string }) => {
+        if (!user?.id) {
+            toast.error("User not authenticated");
+            return;
+        }
+
+        setIsPasswordLoading(true);
+        try {
+            const passwordUpdateData = {
+                currentPassword: passwordData.currentPassword,
+                newPassword: passwordData.newPassword,
+                userId: user.id
+            };
+            await dispatch(updateUserPassword(passwordUpdateData)).unwrap();
+            toast.success("Password updated successfully!");
+            setShowPasswordModal(false);
+        } catch (error: any) {
+            toast.error(error || "Failed to update password");
+        } finally {
+            setIsPasswordLoading(false);
+        }
+    };
+
     if (editMode) {
         return (
             <EditProfile
@@ -112,15 +139,24 @@ export const CreatorProfile = () => {
                 <div className="bg-background rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-6">
                     <div className="flex justify-between items-start mb-4">
                         <span className="font-semibold text-base text-gray-900 dark:text-white">Informações do perfil</span>
-                        <button
-                            className="flex items-center gap-1 text-pink-500 hover:text-pink-600 text-sm font-medium focus:outline-none"
-                            onClick={() => setEditMode(true)}
-                        >
-                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="inline-block">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828A2 2 0 019 17H7v-2a2 2 0 012-2z" />
-                            </svg>
-                            Edit
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button
+                                className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-sm font-medium focus:outline-none"
+                                onClick={() => setShowPasswordModal(true)}
+                            >
+                                <Key className="w-4 h-4" />
+                                Change Password
+                            </button>
+                            <button
+                                className="flex items-center gap-1 text-pink-500 hover:text-pink-600 text-sm font-medium focus:outline-none"
+                                onClick={() => setEditMode(true)}
+                            >
+                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="inline-block">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828A2 2 0 019 17H7v-2a2 2 0 012-2z" />
+                                </svg>
+                                Edit Profile
+                            </button>
+                        </div>
                     </div>
                     <div className="flex flex-col gap-8 items-start">
                         {/* Avatar and name */}
@@ -178,6 +214,14 @@ export const CreatorProfile = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Update Password Modal */}
+            <UpdatePasswordModal
+                isOpen={showPasswordModal}
+                onClose={() => setShowPasswordModal(false)}
+                onSubmit={handleUpdatePassword}
+                isLoading={isPasswordLoading}
+            />
         </div>
     );
 };

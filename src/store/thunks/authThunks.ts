@@ -1,6 +1,6 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { loginStart, loginSuccess, loginFailure, signupStart, signupSuccess, signupFailure, logout } from '../slices/authSlice';
-import { signup, signin, logout as logoutAPI } from '../../api/auth';
+import { signup, signin, logout as logoutAPI, updatePassword } from '../../api/auth';
 
 interface LoginCredentials {
   email: string;
@@ -14,6 +14,12 @@ interface SignupCredentials {
   whatsapp?: string;
   isStudent?: boolean;
   role: 'creator' | 'brand';
+}
+
+interface UpdatePasswordCredentials {
+  currentPassword: string;
+  newPassword: string;
+  userId: string;
 }
 
 interface AuthResponse {
@@ -100,6 +106,25 @@ export const logoutUser = createAsyncThunk(
       // Always clear state regardless of API call success
       // redux-persist will handle localStorage cleanup
       dispatch(logout());
+    }
+  }
+);
+
+// Async thunk for updating password
+export const updateUserPassword = createAsyncThunk(
+  'auth/updatePassword',
+  async (credentials: UpdatePasswordCredentials, { rejectWithValue }) => {
+    try {
+      const response = await updatePassword(credentials.userId,credentials.newPassword, credentials.currentPassword);
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Password update failed');
+      }
+
+      return response.message || 'Password updated successfully';
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || error?.message || 'Password update failed';
+      return rejectWithValue(errorMessage);
     }
   }
 );

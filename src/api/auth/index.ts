@@ -95,8 +95,17 @@ export const forgotPassword = async (data: any) => {
     return response.data;
 };
 
+// Update Password Function
+export const updatePassword = async (user_id: string, newPassword: string, currentPassword: string) => {
+    const response = await AuthAPI.put("/api/update-password", {
+        user_id,
+        current_password: currentPassword,
+        new_password: newPassword,
+        password_confirmation: newPassword
+    });
+    return response.data;
+};
 // Logout Function
 export const logout = async () => {
     const response = await AuthAPI.post("/api/logout");
-    return response.data;
-};
+}; 
