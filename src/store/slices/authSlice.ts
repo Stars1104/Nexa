@@ -4,7 +4,7 @@ interface User {
   id: string;
   email: string;
   name: string;
-  role: 'creator' | 'brand' | 'student';
+  role: 'creator' | 'brand' | 'student' | 'admin';
   whatsapp?: string;
   isStudent?: boolean;
   isPremium?: boolean; // Added for testing

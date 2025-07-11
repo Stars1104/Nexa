@@ -4,10 +4,16 @@ import { useAppSelector } from '../store/hooks';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  allowedRoles?: ('creator' | 'brand' | 'admin' | 'student')[];
+  redirectTo?: string;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, token } = useAppSelector((state) => state.auth);
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
+  children, 
+  allowedRoles, 
+  redirectTo 
+}) => {
+  const { isAuthenticated, token, user } = useAppSelector((state) => state.auth);
   const location = useLocation();
 
   // If not authenticated or no token, redirect to signin page
@@ -16,8 +22,34 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 
-  // If authenticated, render the protected component
+  // If user exists and role-based access is specified
+  if (user && allowedRoles && allowedRoles.length > 0) {
+    // Check if user's role is allowed
+    if (!allowedRoles.includes(user.role)) {
+      // Redirect to appropriate dashboard based on user's role
+      const defaultDashboard = getDefaultDashboard(user.role);
+      return <Navigate to={redirectTo || defaultDashboard} replace />;
+    }
+  }
+
+  // If authenticated and role check passes (or no role check required), render the protected component
   return <>{children}</>;
+};
+
+// Helper function to get default dashboard based on user role
+const getDefaultDashboard = (userRole: string): string => {
+  switch (userRole) {
+    case "creator":
+      return "/creator";
+    case "brand":
+      return "/brand";
+    case "admin":
+      return "/admin";
+    case "student":
+      return "/creator"; // Students are redirected to creator dashboard after verification
+    default:
+      return "/creator";
+  }
 };
 
 export default ProtectedRoute; 

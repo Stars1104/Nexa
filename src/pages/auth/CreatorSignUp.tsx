@@ -16,6 +16,7 @@ import { RootState, AppDispatch } from "../../store";
 import { signupUser, loginUser } from "../../store/thunks/authThunks";
 import { clearError } from "../../store/slices/authSlice";
 import { toast } from "sonner";
+import { useRoleNavigation } from "../../hooks/useRoleNavigation";
 
 interface SignUpFormData {
   name: string;
@@ -41,6 +42,7 @@ const CreatorSignUp = () => {
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   const { loginType } = useParams<{ loginType: string }>();
+  const { navigateToRoleDashboard, navigateToStudentVerification } = useRoleNavigation();
   
   const { isSigningUp, isLoading, error, isAuthenticated, user } = useSelector((state: RootState) => state.auth);
 
@@ -63,29 +65,22 @@ const CreatorSignUp = () => {
   // Effect to handle successful authentication
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.isStudent) {
-        navigate("/student-verify");
+      // Handle student verification flow
+      if (user.isStudent && user.role === 'creator') {
+        navigateToStudentVerification();
       } else {
         // Check if there's a redirect location from ProtectedRoute
-        const from = location.state?.from?.pathname || getDefaultDashboard(user.role);
-        navigate(from, { replace: true });
+        const from = location.state?.from?.pathname;
+        if (from) {
+          navigate(from, { replace: true });
+        } else {
+          navigateToRoleDashboard(user.role);
+        }
       }
     }
-  }, [isAuthenticated, user, role, navigate, location]);
+  }, [isAuthenticated, user, role, navigateToRoleDashboard, navigateToStudentVerification, location]);
 
-  // Helper function to get default dashboard based on user role
-  const getDefaultDashboard = (userRole: string) => {
-    switch (userRole) {
-      case "creator":
-        return "/creator";
-      case "brand":
-        return "/brand";
-      case "admin":
-        return "/admin";
-      default:
-        return "/creator";
-    }
-  };
+
 
   // Clear error when switching auth types
   useEffect(() => {

@@ -33,23 +33,16 @@ const CampaignDetail = ({
   onApprove, 
   onReject,
 }: CampaignDetailProps) => {
-  // Example extended data for demo (replace with real data as needed)
-  const extended = {
+  // Use real campaign data with fallbacks only when needed
+  const displayData = {
     ...campaign,
-    submissionDate: campaign.submissionDate || "20/11/2023",
-    briefing:
-      campaign.briefing ||
-      "Criar conteúdo mostrando produtos de verão em uso na praia. A campanha visa destacar a linha de proteção solar da marca, enfatizando a importância da proteção contra os raios UV. Buscamos criadores que frequentam praias e piscinas e possam demonstrar o uso adequado dos produtos em situações reais.",
-    requirements: [
-      "Criador deve mostrar o produto sendo aplicado",
-      "Mencionar os benefícios de proteção solar",
-      "Incluir a hashtag #VerãoProtegido",
-      "Vídeo deve ter entre 30 e 60 segundos",
-    ],
-    audience:
-      "Pessoas de 18 a 35 anos que frequentam praias e piscinas",
-    deliverables: "1 vídeo para Instagram/TikTok",
-    states: ["SP", "RJ", "BA", "CE", "SC"],
+    // Only provide fallbacks if the real data is missing
+    submissionDate: campaign.submissionDate || new Date().toLocaleDateString("pt-BR"),
+    briefing: campaign.briefing || "Briefing não disponível",
+    requirements: campaign.creatorRequirements || ["Requisitos não especificados"],
+    audience: "Público-alvo não especificado", // This might not be in the campaign data
+    deliverables: "Entregáveis não especificados", // This might not be in the campaign data
+    states: Array.isArray(campaign.states) ? campaign.states : ["Estados não especificados"],
   };
 
   const handleApprove = () => {
@@ -68,19 +61,27 @@ const CampaignDetail = ({
         <DialogHeader>
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 border-b border-gray-200 dark:border-neutral-700 pb-4 mb-4">
-            <img
-              src={CampaignLogo}
-              alt={extended.title + " logo"}
-              className="w-16 h-16 rounded-full object-cover bg-muted border"
-            />
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden border">
+              {displayData.logo ? (
+                <img 
+                  src={`http://localhost:8000${displayData.logo}`} 
+                  alt={`${displayData.brand?.name || 'Campaign'} logo`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                displayData.brand?.name?.charAt(0)?.toUpperCase() || 'N'
+              )}
+            </div>
             <div className="flex-1 text-center sm:text-left">
               <DialogTitle className="text-xl font-bold text-gray-900 dark:text-white">
-                {extended.title}
+                {displayData.title}
               </DialogTitle>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{extended.brand}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {typeof displayData.brand === 'string' ? displayData.brand : displayData.brand?.name || 'Marca não especificada'}
+              </p>
             </div>
             <span className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs font-semibold mt-4">
-              {extended.type}
+              {displayData.type}
             </span>
           </div>
         </DialogHeader>
@@ -90,51 +91,61 @@ const CampaignDetail = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-b border-gray-200 dark:border-neutral-700 pb-4">
             <div>
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">Valor</div>
-              <div className="text-base font-semibold text-gray-800 dark:text-gray-100">R$ {extended.value?.toLocaleString("pt-BR")}</div>
+              <div className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                R$ {(displayData.budget || displayData.value)?.toLocaleString("pt-BR") || 'Não especificado'}
+              </div>
             </div>
             <div>
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">Prazo Final</div>
-              <div className="text-base font-semibold text-gray-800 dark:text-gray-100">{extended.deadline}</div>
+              <div className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                {displayData.deadline ? new Date(displayData.deadline).toLocaleDateString("pt-BR") : 'Não especificado'}
+              </div>
             </div>
             <div>
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">Data de Submissão</div>
-              <div className="text-base font-semibold text-gray-800 dark:text-gray-100">{extended.submissionDate}</div>
+              <div className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                {displayData.submissionDate ? new Date(displayData.submissionDate).toLocaleDateString("pt-BR") : 'Não especificado'}
+              </div>
             </div>
           </div>
 
           {/* Briefing */}
           <section>
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Briefing</h3>
-            <p className="text-gray-700 dark:text-gray-200 text-sm leading-relaxed">{extended.briefing}</p>
+            <p className="text-gray-700 dark:text-gray-200 text-sm leading-relaxed">{displayData.briefing}</p>
           </section>
 
           {/* Requirements */}
           <section>
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Requisitos</h3>
             <ul className="list-disc pl-5 text-gray-700 dark:text-gray-200 text-sm space-y-1">
-              {extended.requirements.map((req, i) => (
-                <li key={i}>{req}</li>
-              ))}
+              {Array.isArray(displayData.requirements) ? (
+                displayData.requirements.map((req, i) => (
+                  <li key={i}>{req}</li>
+                ))
+              ) : (
+                <li>{displayData.requirements}</li>
+              )}
             </ul>
           </section>
 
           {/* Audience */}
           <section>
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Público-Alvo</h3>
-            <p className="text-gray-700 dark:text-gray-200 text-sm">{extended.audience}</p>
+            <p className="text-gray-700 dark:text-gray-200 text-sm">{displayData.audience}</p>
           </section>
 
           {/* Deliverables */}
           <section>
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Entregáveis</h3>
-            <p className="text-gray-700 dark:text-gray-200 text-sm">{extended.deliverables}</p>
+            <p className="text-gray-700 dark:text-gray-200 text-sm">{displayData.deliverables}</p>
           </section>
 
           {/* States */}
           <section>
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Estados</h3>
             <div className="flex flex-wrap gap-2">
-              {extended.states.map((uf, i) => (
+              {displayData.states.map((uf, i) => (
                 <span
                   key={uf}
                   className={`px-2 py-1 rounded-full text-xs font-medium ${statesColors[i % statesColors.length]}`}

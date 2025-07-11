@@ -1,137 +1,280 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardTitle, CardContent, CardFooter } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
-import CampaignLogo from "../../assets/landing/post.png";
 import { Dialog, DialogContent } from "../ui/dialog";
+import { useDispatch, useSelector } from "react-redux";
+import { toast } from "../ui/sonner";
+import { AppDispatch, RootState } from "../../store";
+import { fetchPendingCampaigns, approveCampaign, rejectCampaign } from "../../store/thunks/campaignThunks";
+import { clearError } from "../../store/slices/campaignSlice";
 import CampaignDetail from "@/components/admin/CampaignDetail";
-
-// Hardcoded campaign data
-const initialCampaigns = [
-    {
-        id: 1,
-        title: "Campanha de Verão 2023",
-        brand: "Marca Solar",
-        value: 2500,
-        deadline: "15/12/2023",
-        type: "Vídeo",
-        briefing: "Criar conteúdo mostrando produtos de verão em uso na praia.",
-        logo: "../../assets/landing/post.png",
-    },
-    {
-        id: 2,
-        title: "Lançamento Produto X",
-        brand: "Tech Innovations",
-        value: 1800,
-        deadline: "10/12/2023",
-        type: "Foto",
-        briefing: "Unboxing e primeiras impressões do novo produto.",
-        logo: "../../assets/landing/post.png",
-    },
-];
+import { Campaign } from "../../store/slices/campaignSlice";
 
 export default function PendingCampaign() {
-    const [campaigns, setCampaigns] = useState(initialCampaigns);
-    const [actionStatus, setActionStatus] = useState({}); // { [id]: 'approved' | 'rejected' }
-    const [selectedCampaign, setSelectedCampaign] = useState(null);
+    const dispatch = useDispatch<AppDispatch>();
+    const { pendingCampaigns, isLoading, error } = useSelector((state: RootState) => state.campaign);
+    const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
     const [detailOpen, setDetailOpen] = useState(false);
+    const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
+    
+    // Ensure pendingCampaigns is always an array
+    const campaignsToDisplay = Array.isArray(pendingCampaigns) ? pendingCampaigns : [];
 
-    const handleApprove = (id) => {
-        setActionStatus((prev) => ({ ...prev, [id]: "approved" }));
-        setTimeout(() => setCampaigns((prev) => prev.filter((c) => c.id !== id)), 800);
+    // Fetch pending campaigns on component mount
+    useEffect(() => {
+        dispatch(fetchPendingCampaigns()).catch((error) => {
+            console.error('Error fetching pending campaigns:', error);
+            toast.error("Erro ao carregar campanhas pendentes");
+        });
+    }, [dispatch]);
+
+    // Clear error on component unmount
+    useEffect(() => {
+        return () => {
+            if (error) {
+                dispatch(clearError());
+            }
+        };
+    }, [dispatch, error]);
+
+    const handleApprove = async (id: number) => {
+        setProcessingIds(prev => new Set(prev).add(id));
+        
+        try {
+            const result = await dispatch(approveCampaign(id));
+            
+            if (approveCampaign.fulfilled.match(result)) {
+                toast.success("Campanha aprovada com sucesso!");
+                // Refresh the pending campaigns list
+                dispatch(fetchPendingCampaigns());
+            } else {
+                toast.error(result.payload || "Erro ao aprovar campanha");
+            }
+        } catch (error) {
+            toast.error("Erro inesperado ao aprovar campanha");
+        } finally {
+            setProcessingIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(id);
+                return newSet;
+            });
+        }
     };
-    const handleReject = (id) => {
-        setActionStatus((prev) => ({ ...prev, [id]: "rejected" }));
-        setTimeout(() => setCampaigns((prev) => prev.filter((c) => c.id !== id)), 800);
+
+    const handleReject = async (id: number) => {
+        setProcessingIds(prev => new Set(prev).add(id));
+        
+        try {
+            const result = await dispatch(rejectCampaign({ campaignId: id, reason: "Rejeitado pelo administrador" }));
+            
+            if (rejectCampaign.fulfilled.match(result)) {
+                toast.success("Campanha rejeitada com sucesso!");
+                // Refresh the pending campaigns list
+                dispatch(fetchPendingCampaigns());
+            } else {
+                toast.error(result.payload || "Erro ao rejeitar campanha");
+            }
+        } catch (error) {
+            toast.error("Erro inesperado ao rejeitar campanha");
+        } finally {
+            setProcessingIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(id);
+                return newSet;
+            });
+        }
     };
-    const handleViewDetails = (campaign) => {
+
+    const handleViewDetails = (campaign: Campaign) => {
         setSelectedCampaign(campaign);
         setDetailOpen(true);
     };
 
-    return (
-        <div className="w-full px-2 sm:px-6 py-6 dark:bg-[#171717] min-h-[92vh]">
-            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-foreground">Campanhas Pendentes</h1>
-                    <p className="text-muted-foreground text-sm mt-1">Aprove ou rejeite campanhas submetidas por marcas</p>
+    const handleRefresh = () => {
+        console.log('Refreshing pending campaigns...');
+        dispatch(fetchPendingCampaigns()).catch((error) => {
+            console.error('Error refreshing pending campaigns:', error);
+            toast.error("Erro ao atualizar campanhas pendentes");
+        });
+    };
+
+    if (isLoading && (!Array.isArray(campaignsToDisplay) || campaignsToDisplay.length === 0)) {
+        return (
+            <div className="w-full px-2 sm:px-6 py-6 dark:bg-[#171717] min-h-[92vh] flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-gray-600 dark:text-gray-400">Carregando campanhas pendentes...</p>
                 </div>
             </div>
-            <div className="w-full flex flex-col gap-4 p-4 sm:p-6 bg-background rounded-lg">
-                <div className="flex gap-2 mt-2 sm:mt-0 justify-between">
+        );
+    }
+
+    return (
+        <div className="w-full px-2 sm:px-6 py-6 dark:bg-[#171717] min-h-[92vh]">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Campanhas Pendentes</h1>
+                    <p className="text-muted-foreground text-sm mt-1">Aprove ou rejeite campanhas submetidas por marcas</p>
+                    {/* Removed Badge for mock data as it's no longer used */}
+                </div>
+                <Button
+                    onClick={handleRefresh}
+                    disabled={isLoading}
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                >
+                    {isLoading ? "Atualizando..." : "Atualizar"}
+                </Button>
+            </div>
+
+            {/* Error message */}
+            {error && (
+                <Alert className="mb-6 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
+                    <AlertTitle className="text-red-800 dark:text-red-200">Erro</AlertTitle>
+                    <AlertDescription className="text-red-700 dark:text-red-300">
+                        {error}
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            <div className="w-full flex flex-col gap-4 p-4 sm:p-6 bg-background rounded-lg border border-gray-200 dark:border-gray-800">
+                <div className="flex gap-2 mt-2 sm:mt-0 justify-between items-center">
                     <div className="flex items-center gap-2">
                         <span className="text-muted-foreground text-sm">Total</span>
-                        <Badge variant="secondary">{campaigns.length} campanhas</Badge>
+                        <Badge variant="secondary" className="bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300">
+                            {campaignsToDisplay.length} campanhas
+                        </Badge>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" className="hidden sm:inline-block">Ordenar</Button>
-                        <Button variant="outline" className="hidden sm:inline-block">Filtrar</Button>
+                        <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+                            Filtrar
+                        </Button>
+                        <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+                            Ordenar
+                        </Button>
                     </div>
                 </div>
+
                 <div className="space-y-6">
-                    {campaigns.length === 0 && (
+                    {(!Array.isArray(campaignsToDisplay) || campaignsToDisplay.length === 0) && !isLoading && (
                         <Alert className="mt-8">
                             <AlertTitle>Nenhuma campanha pendente</AlertTitle>
-                            <AlertDescription>Não há campanhas aguardando aprovação no momento.</AlertDescription>
+                            <AlertDescription>
+                                Não há campanhas aguardando aprovação no momento.
+                            </AlertDescription>
                         </Alert>
                     )}
-                    {campaigns.map((c) => (
-                        <Card key={c.id} className="p-0 border bg-background text-foreground shadow-sm">
+
+                    {campaignsToDisplay.map((campaign, index) => (
+                        <Card key={campaign.id || `campaign-${index}`} className="p-0 border bg-background text-foreground shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex flex-col gap-2 sm:gap-0 sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-6">
                                 <div className="flex flex-col gap-1 w-full">
                                     <div className="flex items-center gap-3">
-                                        <img src={CampaignLogo} alt={c.title + ' logo'} className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover bg-muted border" />
-                                        <CardTitle className="text-base sm:text-lg md:text-xl">{c.title}</CardTitle>
+                                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden">
+                                            {campaign.logo ? (
+                                                 <img 
+                                                     src={`http://localhost:8000${campaign.logo}`}
+                                                     alt={`${campaign.brand.name} logo`}
+                                                     className="w-full h-full object-cover"
+                                                 />
+                                            ) : (
+                                                campaign.brand?.name?.charAt(0)?.toUpperCase() || 'N'
+                                            )}
+                                        </div>
+                                        <div>
+                                            <CardTitle className="text-lg sm:text-xl text-foreground">{campaign.title}</CardTitle>
+                                            <p className="text-sm text-muted-foreground">por {campaign.brand?.name || 'Marca não especificada'}</p>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs sm:text-sm text-muted-foreground mt-1">
-                                        <span><span className="font-medium text-foreground">Marca</span><br className="sm:hidden" /> {c.brand}</span>
-                                        <span className="hidden sm:inline-block mx-2">|</span>
-                                        <span><span className="font-medium text-foreground">Valor</span><br className="sm:hidden" /> R$ {c.value.toLocaleString("pt-BR")}</span>
-                                        <span className="hidden sm:inline-block mx-2">|</span>
-                                        <span><span className="font-medium text-foreground">Deadline</span><br className="sm:hidden" /> <span className="font-semibold text-foreground">{c.deadline}</span></span>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm text-muted-foreground mt-2">
+                                        <div className="flex items-center gap-4">
+                                            <span>
+                                                <span className="font-medium text-foreground">Valor:</span> R$ {campaign.budget?.toLocaleString("pt-BR") || campaign.value?.toLocaleString("pt-BR")}
+                                            </span>
+                                            <span>
+                                                <span className="font-medium text-foreground">Prazo:</span> {campaign.deadline ? new Date(campaign.deadline).toLocaleDateString("pt-BR") : 'Prazo não definido'}
+                                            </span>
+                                            <span>
+                                                <span className="font-medium text-foreground">Estados:</span> {Array.isArray(campaign.states) ? campaign.states.join(", ") : (campaign.states || 'Não especificado')}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                                <Badge variant="outline" className="self-end sm:self-center mt-2 sm:mt-0">{c.type}</Badge>
+                                <div className="flex items-center gap-2 self-end sm:self-center mt-2 sm:mt-0">
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                        {campaign.type}
+                                    </Badge>
+                                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">
+                                        Pendente
+                                    </Badge>
+                                </div>
                             </div>
+                            
                             <CardContent className="pt-4 pb-2 px-4 sm:px-6">
-                                <div>
-                                    <span className="block text-xs text-muted-foreground mb-1">Briefing</span>
-                                    <span className="text-sm text-foreground">{c.briefing}</span>
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="block text-sm font-medium text-foreground mb-1">Descrição</span>
+                                        <p className="text-sm text-muted-foreground">{campaign.description}</p>
+                                    </div>
+                                    {campaign.briefing && (
+                                        <div>
+                                            <span className="block text-sm font-medium text-foreground mb-1">Briefing</span>
+                                            <p className="text-sm text-muted-foreground line-clamp-2">{campaign.briefing}</p>
+                                        </div>
+                                    )}
+                                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                        <span>Submetido em: {campaign.submissionDate ? new Date(campaign.submissionDate).toLocaleDateString("pt-BR") : 'Data não disponível'}</span>
+                                        {campaign.creatorRequirements && campaign.creatorRequirements.length > 0 && (
+                                            <span>• Requisitos: {Array.isArray(campaign.creatorRequirements) ? campaign.creatorRequirements.join(", ") : String(campaign.creatorRequirements)}</span>
+                                        )}
+                                    </div>
                                 </div>
                             </CardContent>
+                            
                             <CardFooter className="flex flex-col sm:flex-row sm:justify-end gap-2 px-4 sm:px-6 pb-4">
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => handleViewDetails(c)}
+                                    onClick={() => handleViewDetails(campaign)}
                                     className="w-full sm:w-auto"
                                 >
                                     Ver detalhes
                                 </Button>
                                 <Button
                                     size="sm"
-                                    onClick={() => handleReject(c.id)}
-                                    disabled={actionStatus[c.id] === "rejected" || actionStatus[c.id] === "approved"}
-                                    className="w-full sm:w-auto bg-[#DC2626] text-white"
+                                    onClick={() => handleReject(campaign.id)}
+                                    disabled={processingIds.has(campaign.id)}
+                                    variant="destructive"
+                                    className="w-full sm:w-auto"
                                 >
-                                    {actionStatus[c.id] === "rejected" ? "Rejeitado" : "Rejeitar"}
+                                    {processingIds.has(campaign.id) ? "Rejeitando..." : "Rejeitar"}
                                 </Button>
                                 <Button
                                     size="sm"
-                                    onClick={() => handleApprove(c.id)}
-                                    disabled={actionStatus[c.id] === "approved" || actionStatus[c.id] === "rejected"}
-                                    className="w-full sm:w-auto bg-[#16A34A] text-white"
+                                    onClick={() => handleApprove(campaign.id)}
+                                    disabled={processingIds.has(campaign.id)}
+                                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
                                 >
-                                    {actionStatus[c.id] === "approved" ? "Aprovado" : "Aprovar"}
+                                    {processingIds.has(campaign.id) ? "Aprovando..." : "Aprovar"}
                                 </Button>
                             </CardFooter>
                         </Card>
                     ))}
                 </div>
             </div>
+
+            {/* Campaign Detail Modal */}
             {selectedCampaign && (
-                <CampaignDetail campaign={selectedCampaign} open={detailOpen} onOpenChange={setDetailOpen} onApprove={() => { }} onReject={() => { }} path="pending" />
+                <CampaignDetail
+                    campaign={selectedCampaign}
+                    open={detailOpen}
+                    onOpenChange={setDetailOpen}
+                    onApprove={() => handleApprove(selectedCampaign.id)}
+                    onReject={() => handleReject(selectedCampaign.id)}
+                    path="pending"
+                />
             )}
         </div>
     );

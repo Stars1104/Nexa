@@ -36,22 +36,22 @@ const App = () => {
               <Route path="/auth/:loginType" element={<Signup />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/student-verify" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['creator', 'student']}>
                   <StudentVerify />
                 </ProtectedRoute>
               } />
               <Route path="/creator" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['creator', 'student']}>
                   <CreatorIndex />
                 </ProtectedRoute>
               } />
               <Route path="/brand" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['brand']}>
                   <BrandIndex />
                 </ProtectedRoute>
               } />
               <Route path="/admin" element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <AdminIndex />
                 </ProtectedRoute>
               } />

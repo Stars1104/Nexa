@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '../../components/ui/alert';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { useNavigate } from 'react-router-dom';
+import { useRoleNavigation } from '../../hooks/useRoleNavigation';
 
 const initialState = {
   fullName: '',
@@ -18,6 +19,8 @@ const initialState = {
 export default function StudentVerify() {
   const [form, setForm] = useState(initialState);
   const navigate = useNavigate();
+  const { navigateToRoleDashboard } = useRoleNavigation();
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
@@ -25,7 +28,8 @@ export default function StudentVerify() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log(JSON.stringify(form, null, 2));
-    navigate("/creator/dashboard");
+    // After student verification, redirect to creator dashboard
+    navigateToRoleDashboard('creator');
     // Handle form submission logic here
   };
 
