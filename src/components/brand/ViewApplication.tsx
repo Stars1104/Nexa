@@ -26,9 +26,12 @@ const valueClass = "text-base font-semibold text-gray-800 dark:text-gray-100";
 
 interface ViewApplicationProps {
   setComponent?: (component: string) => void;
+  campaign?: any;
 }
 
-const ViewApplication: React.FC<ViewApplicationProps> = ({ setComponent }) => {
+const ViewApplication: React.FC<ViewApplicationProps> = ({ setComponent, campaign: propCampaign }) => {
+  const campaign = propCampaign;
+
   return (
     <div className="min-h-[92vh] dark:bg-[#171717] flex flex-col items-center py-4 px-2 sm:px-10">
       {/* Top Bar */}
@@ -54,67 +57,45 @@ const ViewApplication: React.FC<ViewApplicationProps> = ({ setComponent }) => {
       {/* Main Card */}
       <div className="w-full bg-background rounded-xl shadow-md p-4 sm:p-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 border-b border-gray-200 dark:border-neutral-700 pb-4 mb-4">
-          <div className="flex-shrink-0 w-16 h-16 rounded-full bg-gray-200 dark:bg-neutral-700 flex items-center justify-center text-3xl font-bold text-gray-400">
-            {/* Placeholder for logo/avatar */}
-            <span role="img" aria-label="Brand">🌞</span>
+        <div className="flex flex-col sm:flex-row items-center justify-between sm:items-start gap-4 border-b border-gray-200 dark:border-neutral-700 pb-4 mb-4">
+          <div className="flex justify-center items-center gap-4">
+            <div className="flex-shrink-0 w-16 h-16 rounded-full bg-gray-200 dark:bg-neutral-700 flex items-center justify-center text-3xl font-bold text-gray-400">
+            <img src={`http://localhost:8000${campaign.logo}`} alt="Brand" className="w-16 h-16 rounded-full" />
           </div>
           <div className="flex-1 text-center sm:text-left">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">{campaign.title}</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{campaign.brand}</p>
           </div>
-          <span className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs font-semibold">{campaign.type}</span>
+          </div>
+          <span className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs font-semibold">{campaign.category}</span>
         </div>
 
         {/* Info Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 border-b border-gray-200 dark:border-neutral-700 pb-4">
           <div>
             <div className={labelClass}>Valor</div>
-            <div className={valueClass}>{campaign.value}</div>
+            <div className={valueClass}>{campaign.budget}</div>
           </div>
           <div>
-            <div className={labelClass}>Prazo Final</div>
-            <div className={valueClass}>{campaign.deadline}</div>
+            <div className={labelClass}>Data de criação</div>
+            <div className={valueClass}>{campaign.deadline ? new Date(campaign.created_at).toLocaleDateString('pt-BR') : ''}</div>
           </div>
           <div>
             <div className={labelClass}>Data de Submissão</div>
-            <div className={valueClass}>{campaign.submissionDate}</div>
+            <div className={valueClass}>{campaign.deadline ? new Date(campaign.deadline).toLocaleDateString('pt-BR') : ''}</div>
           </div>
         </div>
 
         {/* Briefing */}
         <section className="mb-6">
           <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Briefing</h3>
-          <p className="text-gray-700 dark:text-gray-200 text-sm leading-relaxed">{campaign.briefing}</p>
-        </section>
-
-        {/* Requirements */}
-        <section className="mb-6">
-          <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Requisitos</h3>
-          <ul className="list-disc pl-5 text-gray-700 dark:text-gray-200 text-sm space-y-1">
-            {campaign.requirements.map((req, i) => (
-              <li key={i}>{req}</li>
-            ))}
-          </ul>
-        </section>
-
-        {/* Audience */}
-        <section className="mb-6">
-          <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Público-Alvo</h3>
-          <p className="text-gray-700 dark:text-gray-200 text-sm">{campaign.audience}</p>
-        </section>
-
-        {/* Deliverables */}
-        <section className="mb-6">
-          <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Entregáveis</h3>
-          <p className="text-gray-700 dark:text-gray-200 text-sm">{campaign.deliverables}</p>
+          <p className="text-gray-700 dark:text-gray-200 text-sm leading-relaxed">{campaign.description}</p>
         </section>
 
         {/* States */}
         <section className="mb-6">
           <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Estados</h3>
           <div className="flex flex-wrap gap-2">
-            {campaign.states.map((uf) => (
+            {(campaign.states ?? []).map((uf) => (
               <span
                 key={uf}
                 className="px-2 py-1 rounded-full bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-200 text-xs font-medium"

@@ -9,6 +9,7 @@ import {
   updateProfileFailure 
 } from '../slices/userSlice';
 import { getProfile, profileUpdate } from '../../api/auth';
+import { handleApiError } from '../../lib/api-error-handler';
 
 // Async thunk for fetching user profile
 export const fetchUserProfile = createAsyncThunk(
@@ -25,10 +26,10 @@ export const fetchUserProfile = createAsyncThunk(
 
       dispatch(fetchProfileSuccess(response.profile));
       return response.profile;
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to fetch profile';
-      dispatch(fetchProfileFailure(errorMessage));
-      return rejectWithValue(errorMessage);
+    } catch (error: unknown) {
+      const apiError = handleApiError(error);
+      dispatch(fetchProfileFailure(apiError.message));
+      return rejectWithValue(apiError.message);
     }
   }
 );
@@ -73,10 +74,10 @@ export const updateUserProfile = createAsyncThunk(
 
       dispatch(updateProfileSuccess(response.profile));
       return response.profile;
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to update profile';
-      dispatch(updateProfileFailure(errorMessage));
-      return rejectWithValue(errorMessage);
+    } catch (error: unknown) {
+      const apiError = handleApiError(error);
+      dispatch(updateProfileFailure(apiError.message));
+      return rejectWithValue(apiError.message);
     }
   }
 ); 

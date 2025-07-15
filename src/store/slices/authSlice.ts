@@ -83,6 +83,12 @@ const authSlice = createSlice({
         state.user.isPremium = !state.user.isPremium;
       }
     },
+    // Temporary action to toggle admin role for testing
+    toggleAdminRole: (state) => {
+      if (state.user) {
+        state.user.role = state.user.role === 'admin' ? 'creator' : 'admin';
+      }
+    },
   },
 });
 
@@ -96,6 +102,7 @@ export const {
   logout, 
   clearError,
   checkAuthStatus,
-  togglePremium
+  togglePremium,
+  toggleAdminRole
 } = authSlice.actions;
 export default authSlice.reducer; 

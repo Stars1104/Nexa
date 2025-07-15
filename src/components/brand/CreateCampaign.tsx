@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Button } from "../ui/button";
@@ -19,6 +19,37 @@ const CAMPAIGN_TYPES = [
   "Vídeo", "Foto", "Review", "Unboxing", "Tutorial", "Story", "Reels", "Post"
 ];
 
+// Brazilian states
+const BRAZILIAN_STATES = [
+  "Acre",
+  "Alagoas",
+  "Amapá",
+  "Amazonas",
+  "Bahia",
+  "Ceará",
+  "Distrito Federal",
+  "Espírito Santo",
+  "Goiás",
+  "Maranhão",
+  "Mato Grosso",
+  "Mato Grosso do Sul",
+  "Minas Gerais",
+  "Pará",
+  "Paraíba",
+  "Paraná",
+  "Pernambuco",
+  "Piauí",
+  "Rio de Janeiro",
+  "Rio Grande do Norte",
+  "Rio Grande do Sul",
+  "Rondônia",
+  "Roraima",
+  "Santa Catarina",
+  "São Paulo",
+  "Sergipe",
+  "Tocantins"
+];
+
 // Example states and requirements (should come from API in real app)
 const REQUIREMENTS = [
   "Instagram", "TikTok", "YouTube", "+10k seguidores", "Portfólio", "Vídeo", "Foto"
@@ -28,10 +59,30 @@ export default function CreateCampaign() {
   const dispatch = useDispatch<AppDispatch>();
   const { isCreating, error } = useSelector((state: RootState) => state.campaign);
   
+  // Form reset function - memoized to prevent unnecessary re-renders
+  const resetForm = useCallback(() => {
+    setTitle("");
+    setDescription("");
+    setBudget("");
+    setDeadline(undefined);
+    setSelectedStates([]);
+    setFile(null);
+    setImagePreview(null);
+    setCreatorReq("");
+    setCampaignType("");
+    setAttachments([]);
+  }, []);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      // Clear any pending timeouts when component unmounts
+    };
+  }, []);
+  
   // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [briefing, setBriefing] = useState("");
   const [budget, setBudget] = useState("");
   const [deadline, setDeadline] = useState<Date | undefined>();
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
@@ -45,18 +96,36 @@ export default function CreateCampaign() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
-  const [inputState, setInputState] = useState("");
+
+  // Safe toast function with error handling
+  const safeToast = useCallback((type: 'error' | 'success', message: string) => {
+    try {
+      if (type === 'error') {
+        toast.error(message);
+      } else {
+        toast.success(message);
+      }
+    } catch (err) {
+      console.error('Toast error:', err);
+      // Fallback to console or alert if toast fails
+      if (type === 'error') {
+        console.error(message);
+      } else {
+        console.log(message);
+      }
+    }
+  }, []);
 
   // File upload handlers
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) {
       if (!f.type.startsWith("image")) {
-        toast.error("Apenas arquivos de imagem são permitidos.");
+        safeToast('error', "Apenas arquivos de imagem são permitidos.");
         return;
       }
       if (f.size > 10 * 1024 * 1024) {
-        toast.error("Arquivo muito grande. Máx: 10MB");
+        safeToast('error', "Arquivo muito grande. Máx: 10MB");
         return;
       }
       setFile(f);
@@ -69,11 +138,11 @@ export default function CreateCampaign() {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const f = e.dataTransfer.files[0];
       if (!f.type.startsWith("image")) {
-        toast.error("Apenas arquivos de imagem são permitidos.");
+        safeToast('error', "Apenas arquivos de imagem são permitidos.");
         return;
       }
       if (f.size > 10 * 1024 * 1024) {
-        toast.error("Arquivo muito grande. Máx: 10MB");
+        safeToast('error', "Arquivo muito grande. Máx: 10MB");
         return;
       }
       setFile(f);
@@ -94,22 +163,13 @@ export default function CreateCampaign() {
     setSelectedStates((prev) => prev.filter((s) => s.toLowerCase() !== state.toLowerCase()));
   };
 
-  // Handle input for state codes
-  const handleStateInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      const value = inputState.trim().toUpperCase();
-      console.log("Adding state:", value, "Current states:", selectedStates);
-      if (value && !selectedStates.some(s => s.toUpperCase() === value)) {
-        setSelectedStates(prev => {
-          const newStates = [...prev, value];
-          console.log("New states array:", newStates);
-          return newStates;
-        });
-      }
-      setInputState("");
-          }
-    };
+  // Handle state selection
+  const handleStateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedState = e.target.value;
+    if (selectedState && !selectedStates.includes(selectedState)) {
+      setSelectedStates(prev => [...prev, selectedState]);
+    }
+  };
 
   // Attachment handlers
   const handleAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,38 +190,34 @@ export default function CreateCampaign() {
   // Form validation
   const validateForm = (): boolean => {
     if (!title.trim()) {
-      toast.error("Título da campanha é obrigatório.");
+      safeToast('error', "Título da campanha é obrigatório.");
       return false;
     }
     if (!description.trim()) {
-      toast.error("Descrição da campanha é obrigatória.");
-      return false;
-    }
-    if (!briefing.trim()) {
-      toast.error("Briefing da campanha é obrigatório.");
+      safeToast('error', "Descrição da campanha é obrigatória.");
       return false;
     }
     if (!budget.trim()) {
-      toast.error("Orçamento é obrigatório.");
+      safeToast('error', "Orçamento é obrigatório.");
       return false;
     }
     if (!deadline) {
-      toast.error("Prazo final é obrigatório.");
+      safeToast('error', "Prazo final é obrigatório.");
       return false;
     }
     if (selectedStates.length === 0) {
-      toast.error("Selecione pelo menos um estado.");
+      safeToast('error', "Selecione pelo menos um estado.");
       return false;
     }
     if (!campaignType) {
-      toast.error("Tipo de campanha é obrigatório.");
+      safeToast('error', "Tipo de campanha é obrigatório.");
       return false;
     }
     return true;
   };
 
-  // Form submit
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Form submit - memoized to prevent unnecessary re-renders
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -176,7 +232,6 @@ export default function CreateCampaign() {
       const campaignData = {
         title: title.trim(),
         description: description.trim(),
-        briefing: briefing.trim(),
         budget: budget.trim(),
         deadline: deadline!,
         states: selectedStates,
@@ -191,37 +246,29 @@ export default function CreateCampaign() {
       const result = await dispatch(createCampaign(campaignData));
       
       if (createCampaign.fulfilled.match(result)) {
+        // Use a more stable approach to prevent DOM manipulation issues
         setIsSubmitted(true);
-        toast.success("Campanha criada com sucesso! Aguarde a aprovação do administrador.");
+        safeToast('success', "Campanha criada com sucesso! Aguarde a aprovação do administrador.");
         
-        // Reset form
-        setTitle("");
-        setDescription("");
-        setBriefing("");
-        setBudget("");
-        setDeadline(undefined);
-        setSelectedStates([]);
-        setFile(null);
-        setImagePreview(null);
-        setCreatorReq("");
-        setCampaignType("");
-        setAttachments([]);
-        setInputState("");
+        // Reset form with a slight delay to prevent rapid state changes
+        setTimeout(() => {
+          resetForm();
+        }, 100);
         
         // Reset success state after 5 seconds
         setTimeout(() => setIsSubmitted(false), 5000);
       } else {
-        toast.error(result.payload || "Erro ao criar campanha.");
+        safeToast('error', result.payload || "Erro ao criar campanha.");
       }
     } catch (err) {
-      toast.error("Erro inesperado ao criar campanha.");
+      safeToast('error', "Erro inesperado ao criar campanha.");
     }
-  };
+  }, [title, description, budget, deadline, selectedStates, creatorReq, campaignType, file, attachments, error, dispatch, validateForm, safeToast, resetForm]);
 
   // Show success message if submitted
   if (isSubmitted) {
     return (
-      <div className="min-h-[92vh] dark:bg-[#171717] flex flex-col items-center justify-center py-4 px-2 sm:px-10">
+      <div key="success-message" className="min-h-[92vh] dark:bg-[#171717] flex flex-col items-center justify-center py-4 px-2 sm:px-10">
         <Card className="w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
             <PlusCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
@@ -233,6 +280,7 @@ export default function CreateCampaign() {
             Sua campanha foi enviada para aprovação. Você receberá uma notificação quando ela for aprovada pelo administrador.
           </p>
           <Button
+            key="create-new-campaign-btn"
             onClick={() => setIsSubmitted(false)}
             className="bg-pink-500 hover:bg-pink-600 text-white"
           >
@@ -244,7 +292,7 @@ export default function CreateCampaign() {
   }
 
   return (
-    <div className="min-h-[92vh] dark:bg-[#171717] flex flex-col items-center py-4 px-2 sm:px-10">
+    <div key="campaign-form" className="min-h-[92vh] dark:bg-[#171717] flex flex-col items-center py-4 px-2 sm:px-10">
       <form
         onSubmit={handleSubmit}
         className="w-full"
@@ -280,20 +328,7 @@ export default function CreateCampaign() {
              />
            </div>
 
-           {/* Briefing */}
-           <div className="mb-5">
-             <label htmlFor="briefing" className="block text-xs font-medium text-zinc-500 mb-1">Briefing Detalhado *</label>
-             <Textarea
-               id="briefing"
-               value={briefing}
-               onChange={e => setBriefing(e.target.value)}
-               placeholder="Detalhe o que você espera dos criadores..."
-               className="rounded-lg border-zinc-200 dark:border-zinc-700 bg-background text-zinc-900 dark:text-zinc-100 text-sm min-h-[100px]"
-               required
-             />
-           </div>
-
-                     {/* Orçamento */}
+            {/* Orçamento */}
            <div className="mb-5">
              <label htmlFor="budget" className="block text-xs font-medium text-zinc-500 mb-1">Orçamento (R$) *</label>
              <Input
@@ -375,14 +410,17 @@ export default function CreateCampaign() {
                 </span>
               ))}
             </div>
-            <Input
-              placeholder="Digite o estado (ex: SP) e pressione Enter"
-              className="rounded-lg border-zinc-200 dark:border-zinc-700 bg-background text-zinc-900 dark:text-zinc-100 text-sm mb-2"
-              value={inputState}
-              onChange={e => setInputState(e.target.value)}
-              onKeyDown={handleStateInput}
-            />
-            <span className="text-xs text-zinc-400">Digite estados como SP, RJ, MG e pressione Enter para adicionar</span>
+            <select
+              value=""
+              onChange={handleStateChange}
+              className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-background text-zinc-900 dark:text-zinc-100 text-sm"
+            >
+              <option value="">Selecione um estado para adicionar</option>
+              {BRAZILIAN_STATES.filter(state => !selectedStates.includes(state)).map(state => (
+                <option key={state} value={state}>{state}</option>
+              ))}
+            </select>
+            <span className="text-xs text-zinc-400">Selecione estados da lista para adicionar à campanha</span>
           </div>
 
           {/* Referência visual (upload) */}

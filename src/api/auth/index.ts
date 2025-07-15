@@ -32,6 +32,15 @@ AuthAPI.interceptors.response.use(
         if (error.response?.status === 401) {
             // Token might be expired, let the calling code handle it
             console.warn('Authentication failed - token may be expired');
+        } else if (error.response?.status === 403) {
+            // Forbidden - user doesn't have permission
+            console.warn('Access forbidden - user may not have required permissions');
+        } else if (error.response?.status === 404) {
+            // Not found
+            console.warn('Resource not found');
+        } else if (error.response?.status >= 500) {
+            // Server error
+            console.error('Server error:', error.response?.status, error.response?.statusText);
         }
         return Promise.reject(error);
     }
@@ -60,11 +69,49 @@ export const signup = async (data: any) => {
     return response.data;
 };
 
+// Health check function to test backend connectivity
+export const healthCheck = async () => {
+    try {
+        const response = await AuthAPI.get("/api/health");
+        console.log('Health check response:', response.data);
+        return response.data;
+    } catch (error: any) {
+        console.error('Health check failed:', {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            data: error.response?.data,
+            message: error.message
+        });
+        throw error;
+    }
+};
+
+
+
 // Signin Function
 export const signin = async (data: any) => {
-    console.log(data);
-    const response = await AuthAPI.post("/api/login", data);
-    return response.data;
+    console.log('Login payload:', data);
+    console.log('Backend URL:', BackendURL);
+    
+    try {
+        const response = await AuthAPI.post("/api/login", data);
+        console.log('Login response:', response.data);
+        return response.data;
+    } catch (error: any) {
+        console.error('Login error details:', {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            data: error.response?.data,
+            message: error.message,
+            config: {
+                url: error.config?.url,
+                method: error.config?.method,
+                headers: error.config?.headers,
+                data: error.config?.data
+            }
+        });
+        throw error;
+    }
 };
 
 // Profile Update Function

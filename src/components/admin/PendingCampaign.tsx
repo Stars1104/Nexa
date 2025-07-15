@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardTitle, CardContent, CardFooter } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -15,20 +15,42 @@ import { Campaign } from "../../store/slices/campaignSlice";
 export default function PendingCampaign() {
     const dispatch = useDispatch<AppDispatch>();
     const { pendingCampaigns, isLoading, error } = useSelector((state: RootState) => state.campaign);
+    const { user } = useSelector((state: RootState) => state.auth);
     const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
     const [detailOpen, setDetailOpen] = useState(false);
     const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
+    const [accessDenied, setAccessDenied] = useState(false);
+    const timeoutRefs = useRef<number[]>([]);
     
     // Ensure pendingCampaigns is always an array
     const campaignsToDisplay = Array.isArray(pendingCampaigns) ? pendingCampaigns : [];
 
-    // Fetch pending campaigns on component mount
+    console.log(campaignsToDisplay);
+
+    // Check if user has admin role before making API calls
     useEffect(() => {
-        dispatch(fetchPendingCampaigns()).catch((error) => {
-            console.error('Error fetching pending campaigns:', error);
-            toast.error("Erro ao carregar campanhas pendentes");
-        });
-    }, [dispatch]);
+        if (user && user.role !== 'admin') {
+            setAccessDenied(true);
+            toast.error("Acesso negado. Apenas administradores podem acessar esta página.");
+            return;
+        }
+
+        const fetchCampaigns = async () => {
+            try {
+                await dispatch(fetchPendingCampaigns()).unwrap();
+            } catch (error: any) {
+                console.error('Error fetching pending campaigns:', error);
+                if (error?.includes('403') || error?.includes('Acesso negado')) {
+                    setAccessDenied(true);
+                    toast.error("Acesso negado. Você não tem permissão para acessar campanhas pendentes.");
+                } else {
+                    toast.error("Erro ao carregar campanhas pendentes");
+                }
+            }
+        };
+        
+        fetchCampaigns();
+    }, [dispatch, user]);
 
     // Clear error on component unmount
     useEffect(() => {
@@ -39,21 +61,41 @@ export default function PendingCampaign() {
         };
     }, [dispatch, error]);
 
-    const handleApprove = async (id: number) => {
+    // Cleanup timeouts on unmount
+    useEffect(() => {
+        return () => {
+            // Clear any pending timeouts to prevent memory leaks
+            timeoutRefs.current.forEach(timeoutId => {
+                clearTimeout(timeoutId);
+            });
+            timeoutRefs.current = [];
+        };
+    }, []);
+
+    const handleApprove = useCallback(async (id: number) => {
+        if (user?.role !== 'admin') {
+            toast.error("Acesso negado. Apenas administradores podem aprovar campanhas.");
+            return;
+        }
+
         setProcessingIds(prev => new Set(prev).add(id));
         
         try {
-            const result = await dispatch(approveCampaign(id));
-            
-            if (approveCampaign.fulfilled.match(result)) {
+            const result = await dispatch(approveCampaign(id)).unwrap();
+            // Add a small delay to prevent toast from interfering with DOM updates
+            const timeoutId = setTimeout(() => {
                 toast.success("Campanha aprovada com sucesso!");
-                // Refresh the pending campaigns list
-                dispatch(fetchPendingCampaigns());
+            }, 100);
+            timeoutRefs.current.push(timeoutId as unknown as number);
+            // Don't refresh the list - let Redux state handle the UI update
+        } catch (error: any) {
+            console.error('Error approving campaign:', error);
+            const errorMessage = typeof error === 'string' ? error : error?.message || "Erro ao aprovar campanha";
+            if (errorMessage.includes('403') || errorMessage.includes('Acesso negado')) {
+                toast.error("Acesso negado. Você não tem permissão para aprovar campanhas.");
             } else {
-                toast.error(result.payload || "Erro ao aprovar campanha");
+                toast.error(errorMessage);
             }
-        } catch (error) {
-            toast.error("Erro inesperado ao aprovar campanha");
         } finally {
             setProcessingIds(prev => {
                 const newSet = new Set(prev);
@@ -61,23 +103,32 @@ export default function PendingCampaign() {
                 return newSet;
             });
         }
-    };
+    }, [user?.role, dispatch]);
 
-    const handleReject = async (id: number) => {
+    const handleReject = useCallback(async (id: number) => {
+        if (user?.role !== 'admin') {
+            toast.error("Acesso negado. Apenas administradores podem rejeitar campanhas.");
+            return;
+        }
+
         setProcessingIds(prev => new Set(prev).add(id));
         
         try {
-            const result = await dispatch(rejectCampaign({ campaignId: id, reason: "Rejeitado pelo administrador" }));
-            
-            if (rejectCampaign.fulfilled.match(result)) {
+            const result = await dispatch(rejectCampaign({ campaignId: id, reason: "Rejeitado pelo administrador" })).unwrap();
+            // Add a small delay to prevent toast from interfering with DOM updates
+            const timeoutId = setTimeout(() => {
                 toast.success("Campanha rejeitada com sucesso!");
-                // Refresh the pending campaigns list
-                dispatch(fetchPendingCampaigns());
+            }, 100);
+            timeoutRefs.current.push(timeoutId as unknown as number);
+            // Don't refresh the list - let Redux state handle the UI update
+        } catch (error: any) {
+            console.error('Error rejecting campaign:', error);
+            const errorMessage = typeof error === 'string' ? error : error?.message || "Erro ao rejeitar campanha";
+            if (errorMessage.includes('403') || errorMessage.includes('Acesso negado')) {
+                toast.error("Acesso negado. Você não tem permissão para rejeitar campanhas.");
             } else {
-                toast.error(result.payload || "Erro ao rejeitar campanha");
+                toast.error(errorMessage);
             }
-        } catch (error) {
-            toast.error("Erro inesperado ao rejeitar campanha");
         } finally {
             setProcessingIds(prev => {
                 const newSet = new Set(prev);
@@ -85,20 +136,51 @@ export default function PendingCampaign() {
                 return newSet;
             });
         }
-    };
+    }, [user?.role, dispatch]);
 
-    const handleViewDetails = (campaign: Campaign) => {
+    const handleViewDetails = useCallback((campaign: Campaign) => {
         setSelectedCampaign(campaign);
         setDetailOpen(true);
-    };
+    }, []);
 
-    const handleRefresh = () => {
+    const handleRefresh = useCallback(() => {
+        if (user?.role !== 'admin') {
+            toast.error("Acesso negado. Apenas administradores podem acessar esta página.");
+            return;
+        }
+
         console.log('Refreshing pending campaigns...');
-        dispatch(fetchPendingCampaigns()).catch((error) => {
-            console.error('Error refreshing pending campaigns:', error);
-            toast.error("Erro ao atualizar campanhas pendentes");
-        });
-    };
+        const refreshCampaigns = async () => {
+            try {
+                await dispatch(fetchPendingCampaigns()).unwrap();
+            } catch (error: any) {
+                console.error('Error refreshing pending campaigns:', error);
+                const errorMessage = typeof error === 'string' ? error : error?.message || "Erro ao atualizar campanhas pendentes";
+                if (errorMessage.includes('403') || errorMessage.includes('Acesso negado')) {
+                    setAccessDenied(true);
+                    toast.error("Acesso negado. Você não tem permissão para acessar campanhas pendentes.");
+                } else {
+                    toast.error(errorMessage);
+                }
+            }
+        };
+        
+        refreshCampaigns();
+    }, [user?.role, dispatch]);
+
+    // Show access denied message if user doesn't have admin role
+    if (accessDenied || (user && user.role !== 'admin')) {
+        return (
+            <div className="w-full px-2 sm:px-6 py-6 dark:bg-[#171717] min-h-[92vh] flex items-center justify-center">
+                <Alert className="max-w-md border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
+                    <AlertTitle className="text-red-800 dark:text-red-200">Acesso Negado</AlertTitle>
+                    <AlertDescription className="text-red-700 dark:text-red-300">
+                        Você não tem permissão para acessar esta página. Apenas administradores podem visualizar campanhas pendentes.
+                    </AlertDescription>
+                </Alert>
+            </div>
+        );
+    }
 
     if (isLoading && (!Array.isArray(campaignsToDisplay) || campaignsToDisplay.length === 0)) {
         return (
@@ -168,7 +250,7 @@ export default function PendingCampaign() {
                     )}
 
                     {campaignsToDisplay.map((campaign, index) => (
-                        <Card key={campaign.id || `campaign-${index}`} className="p-0 border bg-background text-foreground shadow-sm hover:shadow-md transition-shadow">
+                        <Card key={`campaign-${campaign.id}-${campaign.status}-${processingIds.has(campaign.id)}`} className="p-0 border bg-background text-foreground shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex flex-col gap-2 sm:gap-0 sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-6">
                                 <div className="flex flex-col gap-1 w-full">
                                     <div className="flex items-center gap-3">
@@ -204,7 +286,7 @@ export default function PendingCampaign() {
                                 </div>
                                 <div className="flex items-center gap-2 self-end sm:self-center mt-2 sm:mt-0">
                                     <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                                        {campaign.type}
+                                        {campaign.category}
                                     </Badge>
                                     <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">
                                         Pendente

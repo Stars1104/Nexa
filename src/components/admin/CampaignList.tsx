@@ -1,5 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { fetchCampaigns, approveCampaign, rejectCampaign } from "../../store/thunks/campaignThunks";
+import { clearError } from "../../store/slices/campaignSlice";
 import CampaignDetail from "./CampaignDetail";
+import { Campaign } from "../../store/slices/campaignSlice";
+import { toast } from "../ui/sonner";
 
 const TABS = [
   { label: "Todas", value: "all" },
@@ -10,192 +15,63 @@ const TABS = [
 ];
 
 const STATUS_STYLES: Record<string, string> = {
-  Aprovada: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200",
-  Pendente: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200",
-  Rejeitada: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200",
-  Arquivada: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  approved: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200",
+  pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200",
+  rejected: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200",
+  archived: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 };
 
-const campaigns = [
-  {
-    id: 1,
-    name: "Campanha de Verão 2023",
-    title: "Campanha de Verão 2023",
-    status: "Aprovada",
-    date: "10/11/2023",
-    brand: "Marca Solar",
-    approvedCreators: 5,
-    type: "Vídeo",
-    value: 2500,
-    deadline: "15/12/2023",
-    submissionDate: "10/11/2023",
-    briefing: "Criar conteúdo mostrando produtos de verão em uso na praia. A campanha visa destacar a linha de proteção solar da marca, enfatizando a importância da proteção contra os raios UV.",
-    requirements: [
-      "Criador deve mostrar o produto sendo aplicado",
-      "Mencionar os benefícios de proteção solar",
-      "Incluir a hashtag #VerãoProtegido",
-      "Vídeo deve ter entre 30 e 60 segundos",
-    ],
-    audience: "Pessoas de 18 a 35 anos que frequentam praias e piscinas",
-    deliverables: "1 vídeo para Instagram/TikTok",
-    states: ["SP", "RJ", "BA", "CE", "SC"],
-  },
-  {
-    id: 2,
-    name: "Lançamento Produto X",
-    title: "Lançamento Produto X",
-    status: "Pendente",
-    date: "15/11/2023",
-    brand: "Tech Innovations",
-    approvedCreators: 0,
-    type: "Review",
-    value: 1800,
-    deadline: "20/12/2023",
-    submissionDate: "15/11/2023",
-    briefing: "Review detalhado do novo produto tecnológico, destacando suas funcionalidades e benefícios para o usuário final.",
-    requirements: [
-      "Demonstrar todas as funcionalidades principais",
-      "Comparar com produtos similares",
-      "Incluir opinião pessoal sobre o produto",
-      "Vídeo deve ter entre 5 e 10 minutos",
-    ],
-    audience: "Entusiastas de tecnologia e early adopters",
-    deliverables: "1 vídeo para YouTube",
-    states: ["SP", "RJ", "MG"],
-  },
-  {
-    id: 3,
-    name: "Campanha Natal 2023",
-    title: "Campanha Natal 2023",
-    status: "Aprovada",
-    date: "05/11/2023",
-    brand: "Presentes Incríveis",
-    approvedCreators: 8,
-    type: "Foto",
-    value: 1200,
-    deadline: "10/12/2023",
-    submissionDate: "05/11/2023",
-    briefing: "Criar conteúdo natalino mostrando produtos da marca em cenários festivos e familiares.",
-    requirements: [
-      "Cenário deve ser natalino",
-      "Incluir família ou amigos",
-      "Mostrar produtos sendo utilizados",
-      "Usar hashtag #NatalIncrível",
-    ],
-    audience: "Famílias e pessoas que celebram o Natal",
-    deliverables: "3 fotos para Instagram",
-    states: ["SP", "RJ", "RS", "PR"],
-  },
-  {
-    id: 4,
-    name: "Review App Fitness",
-    title: "Review App Fitness",
-    status: "Rejeitada",
-    date: "12/11/2023",
-    brand: "HealthTech",
-    approvedCreators: 0,
-    type: "Review",
-    value: 1500,
-    deadline: "25/11/2023",
-    submissionDate: "12/11/2023",
-    briefing: "Review do aplicativo de fitness, mostrando suas funcionalidades e resultados obtidos.",
-    requirements: [
-      "Usar o app por pelo menos 1 semana",
-      "Mostrar resultados obtidos",
-      "Demonstrar interface do app",
-      "Incluir depoimento pessoal",
-    ],
-    audience: "Pessoas interessadas em fitness e saúde",
-    deliverables: "1 vídeo para TikTok",
-    states: ["SP", "RJ", "MG", "RS"],
-  },
-  {
-    id: 5,
-    name: "Campanha Sustentabilidade",
-    title: "Campanha Sustentabilidade",
-    status: "Arquivada",
-    date: "20/10/2023",
-    brand: "EcoLife",
-    approvedCreators: 12,
-    type: "Vídeo",
-    value: 3000,
-    deadline: "15/11/2023",
-    submissionDate: "20/10/2023",
-    briefing: "Campanha focada em sustentabilidade e produtos eco-friendly, mostrando o impacto positivo no meio ambiente.",
-    requirements: [
-      "Mostrar produtos sustentáveis em uso",
-      "Explicar benefícios ambientais",
-      "Incluir dicas de sustentabilidade",
-      "Usar hashtag #EcoLife",
-    ],
-    audience: "Pessoas preocupadas com sustentabilidade",
-    deliverables: "1 vídeo para Instagram",
-    states: ["SP", "RJ", "MG", "RS", "PR", "SC"],
-  },
-  {
-    id: 6,
-    name: "Promoção Black Friday",
-    title: "Promoção Black Friday",
-    status: "Aprovada",
-    date: "01/11/2023",
-    brand: "Shopping Online",
-    approvedCreators: 15,
-    type: "Vídeo",
-    value: 2000,
-    deadline: "30/11/2023",
-    submissionDate: "01/11/2023",
-    briefing: "Promoção especial para Black Friday, destacando ofertas e descontos exclusivos.",
-    requirements: [
-      "Mostrar produtos em promoção",
-      "Destacar descontos e ofertas",
-      "Criar senso de urgência",
-      "Incluir link de afiliado",
-    ],
-    audience: "Consumidores em busca de ofertas",
-    deliverables: "1 vídeo para Instagram",
-    states: ["SP", "RJ", "MG", "RS", "PR", "SC", "BA"],
-  },
-  {
-    id: 7,
-    name: "Lançamento Livro",
-    title: "Lançamento Livro",
-    status: "Pendente",
-    date: "18/11/2023",
-    brand: "Editora Cultural",
-    approvedCreators: 0,
-    type: "Review",
-    value: 800,
-    deadline: "15/12/2023",
-    submissionDate: "18/11/2023",
-    briefing: "Review do novo livro lançado pela editora, destacando pontos principais e recomendação.",
-    requirements: [
-      "Ler o livro completo",
-      "Fazer review honesto",
-      "Destacar pontos principais",
-      "Dar recomendação pessoal",
-    ],
-    audience: "Leitores e entusiastas de literatura",
-    deliverables: "1 vídeo para YouTube",
-    states: ["SP", "RJ", "MG"],
-  },
-];
+const STATUS_LABELS: Record<string, string> = {
+  approved: "Aprovada",
+  pending: "Pendente",
+  rejected: "Rejeitada",
+  archived: "Arquivada",
+};
 
-function filterCampaigns(tab: string) {
+function filterCampaigns(campaigns: Campaign[], tab: string) {
   if (tab === "all") return campaigns;
-  if (tab === "approved") return campaigns.filter((c) => c.status === "Aprovada");
-  if (tab === "pending") return campaigns.filter((c) => c.status === "Pendente");
-  if (tab === "rejected") return campaigns.filter((c) => c.status === "Rejeitada");
-  if (tab === "archived") return campaigns.filter((c) => c.status === "Arquivada");
+  if (tab === "approved") return campaigns.filter((c) => c.status === "approved");
+  if (tab === "pending") return campaigns.filter((c) => c.status === "pending");
+  if (tab === "rejected") return campaigns.filter((c) => c.status === "rejected");
+  if (tab === "archived") return campaigns.filter((c) => c.status === "archived");
   return campaigns;
 }
 
 const CampaignList: React.FC = () => {
+  const dispatch = useAppDispatch();
+  const { campaigns, isLoading, error } = useAppSelector((state) => state.campaign);
+  
   const [tab, setTab] = useState("all");
-  const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const filtered = filterCampaigns(tab);
 
-  const handleOpenModal = (campaign) => {
+  const campaignsToDisplay = Array.isArray(campaigns) ? campaigns : [];
+  const filtered = filterCampaigns(campaignsToDisplay, tab);
+
+  // Fetch campaigns on component mount
+  useEffect(() => {
+    const fetchCampaignsData = async () => {
+      try {
+        await dispatch(fetchCampaigns()).unwrap();
+      } catch (error) {
+        console.error('Error fetching campaigns:', error);
+        toast.error("Erro ao carregar campanhas");
+      }
+    };
+    
+    fetchCampaignsData();
+  }, [dispatch]);
+
+  // Clear error on component unmount
+  useEffect(() => {
+    return () => {
+      if (error) {
+        dispatch(clearError());
+      }
+    };
+  }, [dispatch, error]);
+
+  const handleOpenModal = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
     setIsModalOpen(true);
   };
@@ -205,10 +81,71 @@ const CampaignList: React.FC = () => {
     setSelectedCampaign(null);
   };
 
+  const handleApprove = async (campaignId: number) => {
+    try {
+      await dispatch(approveCampaign(campaignId)).unwrap();
+      toast.success("Campanha aprovada com sucesso!");
+      handleCloseModal();
+    } catch (error) {
+      toast.error("Erro ao aprovar campanha");
+    }
+  };
+
+  const handleReject = async (campaignId: number) => {
+    try {
+      await dispatch(rejectCampaign({ campaignId })).unwrap();
+      toast.success("Campanha rejeitada com sucesso!");
+      handleCloseModal();
+    } catch (error) {
+      toast.error("Erro ao rejeitar campanha");
+    }
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="w-full mx-auto px-2 sm:px-6 py-6 dark:bg-[#171717] min-h-[92vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E91E63] mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Carregando campanhas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full mx-auto px-2 sm:px-6 py-6 dark:bg-[#171717] min-h-[92vh] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 dark:text-red-400 mb-4">Erro ao carregar campanhas</p>
+          <button 
+            onClick={async () => {
+              try {
+                await dispatch(fetchCampaigns()).unwrap();
+              } catch (error) {
+                console.error('Error retrying fetch campaigns:', error);
+                toast.error("Erro ao carregar campanhas");
+              }
+            }}
+            className="px-4 py-2 bg-[#E91E63] text-white rounded-lg hover:bg-pink-600 transition-colors"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full mx-auto px-2 sm:px-6 py-6 dark:bg-[#171717] min-h-[92vh]">
       <h2 className="text-2xl sm:text-3xl font-bold mb-1 text-gray-900 dark:text-gray-100">Todas as Campanhas</h2>
       <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm sm:text-base">Visualize e gerencie todas as campanhas da plataforma</p>
+      
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
         {TABS.map((t) => (
@@ -225,68 +162,88 @@ const CampaignList: React.FC = () => {
           </button>
         ))}
       </div>
+
       {/* Table for desktop, cards for mobile */}
       <div className="bg-background rounded-xl shadow p-2 sm:p-6">
-        {/* Desktop Table */}
-        <div className="hidden md:block">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-xs text-gray-500 dark:text-gray-400">
-                <th className="py-3 px-2 font-medium">Nome</th>
-                <th className="py-3 px-2 font-medium">Status</th>
-                <th className="py-3 px-2 font-medium">Data de Criação</th>
-                <th className="py-3 px-2 font-medium">Marca</th>
-                <th className="py-3 px-2 font-medium">Criadores Aprovados</th>
-                <th className="py-3 px-2 font-medium">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
+        {filtered.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400">Nenhuma campanha encontrada</p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-xs text-gray-500 dark:text-gray-400">
+                    <th className="py-3 px-2 font-medium">Nome</th>
+                    <th className="py-3 px-2 font-medium">Status</th>
+                    <th className="py-3 px-2 font-medium">Data de Criação</th>
+                    <th className="py-3 px-2 font-medium">Marca</th>
+                    <th className="py-3 px-2 font-medium">Criadores Aprovados</th>
+                    <th className="py-3 px-2 font-medium">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((c, i) => (
+                    <tr key={i} className="border-t border-gray-100 dark:border-gray-800">
+                      <td className="py-4 px-2 text-sm font-medium text-gray-900 dark:text-gray-100">{c.title}</td>
+                      <td className="py-4 px-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLES[c.status]}`}>
+                          {STATUS_LABELS[c.status]}
+                        </span>
+                      </td>
+                      <td className="py-4 px-2 text-sm text-gray-700 dark:text-gray-300">
+                        {formatDate(c.submissionDate)}
+                      </td>
+                      <td className="py-4 px-2 text-sm text-gray-700 dark:text-gray-300">
+                        {c.brand?.name || 'N/A'}
+                      </td>
+                      <td className="py-4 px-2 text-sm text-center text-gray-700 dark:text-gray-300">
+                        {c.approvedCreators}
+                      </td>
+                      <td className="py-4 px-2">
+                        <button
+                          className="px-4 py-2 border border-[#E91E63] text-[#E91E63] rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                          onClick={() => handleOpenModal(c)}
+                        >
+                          Ver detalhes
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden flex flex-col gap-4">
               {filtered.map((c, i) => (
-                <tr key={i} className="border-t border-gray-100 dark:border-gray-800">
-                  <td className="py-4 px-2 text-sm font-medium text-gray-900 dark:text-gray-100">{c.name}</td>
-                  <td className="py-4 px-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLES[c.status]}`}>{c.status}</span>
-                  </td>
-                  <td className="py-4 px-2 text-sm text-gray-700 dark:text-gray-300">{c.date}</td>
-                  <td className="py-4 px-2 text-sm text-gray-700 dark:text-gray-300">{c.brand}</td>
-                  <td className="py-4 px-2 text-sm text-center text-gray-700 dark:text-gray-300">{c.approvedCreators}</td>
-                  <td className="py-4 px-2">
+                <div key={i} className="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow p-4 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">{c.title}</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLES[c.status]}`}>
+                      {STATUS_LABELS[c.status]}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span>Data: <span className="text-gray-700 dark:text-gray-200">{formatDate(c.submissionDate)}</span></span>
+                    <span>Marca: <span className="text-gray-700 dark:text-gray-200">{c.brand?.name || 'N/A'}</span></span>
+                    <span>Criadores: <span className="text-gray-700 dark:text-gray-200">{c.approvedCreators}</span></span>
+                  </div>
+                  <div className="mt-2">
                     <button
-                      className="px-4 py-2 border border-[#E91E63] text-[#E91E63] rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                      className="w-full px-4 py-2 border border-[#E91E63] text-[#E91E63] rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
                       onClick={() => handleOpenModal(c)}
                     >
                       Ver detalhes
                     </button>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-        {/* Mobile Cards */}
-        <div className="md:hidden flex flex-col gap-4">
-          {filtered.map((c, i) => (
-            <div key={i} className="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow p-4 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-900 dark:text-gray-100">{c.name}</span>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_STYLES[c.status]}`}>{c.status}</span>
-              </div>
-              <div className="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400">
-                <span>Data: <span className="text-gray-700 dark:text-gray-200">{c.date}</span></span>
-                <span>Marca: <span className="text-gray-700 dark:text-gray-200">{c.brand}</span></span>
-                <span>Criadores: <span className="text-gray-700 dark:text-gray-200">{c.approvedCreators}</span></span>
-              </div>
-              <div className="mt-2">
-                <button
-                  className="w-full px-4 py-2 border border-[#E91E63] text-[#E91E63] rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
-                  onClick={() => handleOpenModal(c)}
-                >
-                  Ver detalhes
-                </button>
-              </div>
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </div>
 
       {/* Campaign Detail Modal */}
@@ -295,8 +252,8 @@ const CampaignList: React.FC = () => {
           campaign={selectedCampaign}
           open={isModalOpen}
           onOpenChange={setIsModalOpen}
-          onApprove={() => { }}
-          onReject={() => { }}
+          onApprove={() => handleApprove(selectedCampaign.id)}
+          onReject={() => handleReject(selectedCampaign.id)}
         />
       )}
     </div>

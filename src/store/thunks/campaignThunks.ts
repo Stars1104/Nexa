@@ -1,32 +1,74 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import { RootState } from '../index';
 import { 
   CreateNewCampaign, 
   GetAllCampaigns, 
   GetPendingCampaigns, 
   GetUserCampaigns, 
+  GetAvailableCampaigns, 
+  GetCampaignStats, 
   ApproveCampaign, 
-  RejectCampaign,
-  GetAvailableCampaigns,
-  GetCampaignStats,
-  GetCampaignById,
-  UpdateCampaign,
-  DeleteCampaign,
-  ApplyToCampaign,
-  GetCampaignApplications,
-  ApproveApplication,
-  RejectApplication,
-  GetCreatorApplications,
-  SearchCampaigns,
-  GetCampaignCategories,
+  RejectCampaign, 
+  ArchiveCampaign, 
+  GetCampaignById, 
+  UpdateCampaign, 
+  DeleteCampaign, 
+  ApplyToCampaign, 
+  GetCampaignApplications, 
+  ApproveApplication, 
+  RejectApplication, 
+  GetCreatorApplications, 
+  SearchCampaigns, 
+  GetCampaignCategories, 
   GetCampaignTypes,
   DuplicateCampaign,
   ExtendCampaignDeadline,
   UpdateCampaignBudget,
   GetCampaignAnalytics,
-  ExportCampaigns
+  ExportCampaigns,
+  GetCampaignsByStatus,
+  WithdrawApplication,
+  GetAllApplications,
+  GetApplication,
+  GetApplicationStatistics
 } from '../../api/campaign';
+import { handleApiError } from '../../lib/api-error-handler';
 import { Campaign, CampaignFormData } from '../slices/campaignSlice';
-import { RootState } from '../index';
+
+// API Response types
+interface ApiResponse<T> {
+  data: T;
+  message?: string;
+  success?: boolean;
+}
+
+interface CampaignStats {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  archived: number;
+}
+
+interface CampaignAnalytics {
+  views: number;
+  applications: number;
+  engagement: number;
+  conversion: number;
+}
+
+interface Application {
+  id: number;
+  campaignId: number;
+  creatorId: string;
+  creatorName: string;
+  message: string;
+  status: 'pending' | 'approved' | 'rejected';
+  proposedDeadline?: string;
+  proposedBudget?: number;
+  portfolio?: string;
+  appliedAt: string;
+}
 
 // Create new campaign
 export const createCampaign = createAsyncThunk<
@@ -42,7 +84,7 @@ export const createCampaign = createAsyncThunk<
     if (!user || !token) {
       throw new Error('User not authenticated');
     }
-    
+
     // Create FormData for file upload
     const formData = new FormData();
     formData.append('title', campaignData.title);
@@ -50,9 +92,15 @@ export const createCampaign = createAsyncThunk<
     formData.append('briefing', campaignData.briefing);
     formData.append('budget', campaignData.budget);
     formData.append('deadline', campaignData.deadline.toISOString());
-    formData.append('states', JSON.stringify(campaignData.states));
+    
+    // Handle states - send as comma-separated string
+    console.log(campaignData.states);
+    formData.append('states', campaignData.states.join(','));
+    formData.append('locations', campaignData.states.join(',')); // Also send as locations in case backend expects it
+    
     formData.append('creatorRequirements', campaignData.creatorRequirements);
     formData.append('type', campaignData.type);
+    formData.append('category', campaignData.type); // Also send as category in case backend expects it
     formData.append('brand', user.name);
     formData.append('brandId', user.id);
     formData.append('status', 'pending');
@@ -68,10 +116,17 @@ export const createCampaign = createAsyncThunk<
       formData.append('attach_file', campaignData.attachments[0]);
     }
     
+    // Log FormData contents for debugging
+    console.log('FormData contents:');
+    for (const [key, value] of formData.entries()) {
+      console.log(`${key}:`, value);
+    }
+    
     const response = await CreateNewCampaign(formData, token);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to create campaign');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create campaign';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -90,9 +145,10 @@ export const fetchCampaigns = createAsyncThunk<
     }
     
     const response = await GetAllCampaigns(token);
-    return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch campaigns');
+    return response.data;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch campaigns';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -105,15 +161,23 @@ export const fetchPendingCampaigns = createAsyncThunk<
   try {
     const state = getState();
     const token = state.auth.token;
+    const user = state.auth.user;
     
     if (!token) {
       throw new Error('User not authenticated');
     }
 
+    if (!user || user.role !== 'admin') {
+      throw new Error('Acesso negado. Apenas administradores podem acessar campanhas pendentes.');
+    }
+
     const response = await GetPendingCampaigns(token);
-    return (response.data.data);
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch pending campaigns');
+    console.log('Pending campaigns:', response.data);
+    return (response.data);
+  } catch (error: unknown) {
+    const apiError = handleApiError(error);
+    console.error('Error in fetchPendingCampaigns:', apiError);
+    return rejectWithValue(apiError.message);
   }
 });
 
@@ -133,9 +197,10 @@ export const fetchUserCampaigns = createAsyncThunk<
     }
     
     const response = await GetUserCampaigns(user.id, token);
-    return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch user campaigns');
+    return Array.isArray(response) ? response : Object.values(response);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user campaigns';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -161,14 +226,15 @@ export const fetchAvailableCampaigns = createAsyncThunk<
     
     const response = await GetAvailableCampaigns(token, filters);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch available campaigns');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch available campaigns';
+    return rejectWithValue(errorMessage);
   }
 });
 
 // Fetch campaign statistics
 export const fetchCampaignStats = createAsyncThunk<
-  any,
+  CampaignStats,
   void,
   { state: RootState; rejectValue: string }
 >('campaign/fetchStats', async (_, { getState, rejectWithValue }) => {
@@ -182,8 +248,9 @@ export const fetchCampaignStats = createAsyncThunk<
     
     const response = await GetCampaignStats(token);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch campaign statistics');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch campaign statistics';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -203,8 +270,9 @@ export const fetchCampaignById = createAsyncThunk<
     
     const response = await GetCampaignById(campaignId, token);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch campaign');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch campaign';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -229,9 +297,15 @@ export const updateCampaign = createAsyncThunk<
     formData.append('briefing', data.briefing);
     formData.append('budget', data.budget);
     formData.append('deadline', data.deadline.toISOString());
-    formData.append('states', JSON.stringify(data.states));
+    
+    // Handle states - send as comma-separated string
+    const filteredStates = data.states.filter(Boolean);
+    formData.append('states', filteredStates.join(','));
+    formData.append('locations', filteredStates.join(',')); // Also send as locations in case backend expects it 
+    
     formData.append('creatorRequirements', data.creatorRequirements);
     formData.append('type', data.type);
+    formData.append('category', data.type); // Also send as category in case backend expects it
     
     if (data.logo) {
       formData.append('logo', data.logo);
@@ -243,8 +317,9 @@ export const updateCampaign = createAsyncThunk<
     
     const response = await UpdateCampaign(campaignId, formData, token);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to update campaign');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update campaign';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -264,20 +339,21 @@ export const deleteCampaign = createAsyncThunk<
     
     await DeleteCampaign(campaignId, token);
     return { campaignId };
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to delete campaign');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete campaign';
+    return rejectWithValue(errorMessage);
   }
 });
 
 // Apply to campaign (for creators)
 export const applyToCampaign = createAsyncThunk<
-  any,
+  Application,
   {
     campaignId: number;
-    message: string;
-    portfolio?: File;
-    proposedDeadline?: string;
-    proposedBudget?: number;
+    proposal: string;
+    portfolio_links?: string[];
+    estimated_delivery_days?: number;
+    proposed_budget?: number;
   },
   { state: RootState; rejectValue: string }
 >('campaign/apply', async (applicationData, { getState, rejectWithValue }) => {
@@ -289,21 +365,18 @@ export const applyToCampaign = createAsyncThunk<
       throw new Error('User not authenticated');
     }
     
-    const response = await ApplyToCampaign(applicationData.campaignId, {
-      message: applicationData.message,
-      portfolio: applicationData.portfolio,
-      proposedDeadline: applicationData.proposedDeadline,
-      proposedBudget: applicationData.proposedBudget,
-    }, token);
-    return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to apply to campaign');
+    const { campaignId, ...applicationFormData } = applicationData;
+    const response = await ApplyToCampaign(campaignId, applicationFormData, token);
+    return response.data;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to apply to campaign';
+    return rejectWithValue(errorMessage);
   }
 });
 
 // Fetch campaign applications (for brands)
 export const fetchCampaignApplications = createAsyncThunk<
-  any[],
+  Application[],
   number,
   { state: RootState; rejectValue: string }
 >('campaign/fetchApplications', async (campaignId, { getState, rejectWithValue }) => {
@@ -316,15 +389,16 @@ export const fetchCampaignApplications = createAsyncThunk<
     }
     
     const response = await GetCampaignApplications(campaignId, token);
-    return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch applications');
+    return response.data?.data || response.data || response;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch applications';
+    return rejectWithValue(errorMessage);
   }
 });
 
 // Fetch creator applications (for creators)
 export const fetchCreatorApplications = createAsyncThunk<
-  any[],
+  Application[],
   void,
   { state: RootState; rejectValue: string }
 >('campaign/fetchCreatorApplications', async (_, { getState, rejectWithValue }) => {
@@ -337,9 +411,10 @@ export const fetchCreatorApplications = createAsyncThunk<
     }
     
     const response = await GetCreatorApplications(token);
-    return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch applications');
+    return response.data?.data || response.data || response;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch applications';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -357,10 +432,11 @@ export const approveApplication = createAsyncThunk<
       throw new Error('User not authenticated');
     }
     
-    await ApproveApplication(campaignId, applicationId, token);
+    await ApproveApplication(applicationId, token);
     return { campaignId, applicationId };
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to approve application');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to approve application';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -378,10 +454,99 @@ export const rejectApplication = createAsyncThunk<
       throw new Error('User not authenticated');
     }
     
-    await RejectApplication(campaignId, applicationId, token, reason);
+    await RejectApplication(applicationId, token, reason);
     return { campaignId, applicationId };
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to reject application');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to reject application';
+    return rejectWithValue(errorMessage);
+  }
+});
+
+// Withdraw application (for creators)
+export const withdrawApplication = createAsyncThunk<
+  number,
+  number,
+  { state: RootState; rejectValue: string }
+>('campaign/withdrawApplication', async (applicationId, { getState, rejectWithValue }) => {
+  try {
+    const state = getState();
+    const token = state.auth.token;
+    
+    if (!token) {
+      throw new Error('User not authenticated');
+    }
+    
+    await WithdrawApplication(applicationId, token);
+    return applicationId;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to withdraw application';
+    return rejectWithValue(errorMessage);
+  }
+});
+
+// Get all applications (role-based)
+export const fetchAllApplications = createAsyncThunk<
+  Application[],
+  { status?: string; campaign_id?: number },
+  { state: RootState; rejectValue: string }
+>('campaign/fetchAllApplications', async (filters, { getState, rejectWithValue }) => {
+  try {
+    const state = getState();
+    const token = state.auth.token;
+    
+    if (!token) {
+      throw new Error('User not authenticated');
+    }
+    
+    const response = await GetAllApplications(token, filters);
+    return response.data?.data || response.data || response;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch applications';
+    return rejectWithValue(errorMessage);
+  }
+});
+
+// Get specific application
+export const fetchApplication = createAsyncThunk<
+  Application,
+  number,
+  { state: RootState; rejectValue: string }
+>('campaign/fetchApplication', async (applicationId, { getState, rejectWithValue }) => {
+  try {
+    const state = getState();
+    const token = state.auth.token;
+    
+    if (!token) {
+      throw new Error('User not authenticated');
+    }
+    
+    const response = await GetApplication(applicationId, token);
+    return response.data?.data || response.data || response;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch application';
+    return rejectWithValue(errorMessage);
+  }
+});
+
+// Get application statistics
+export const fetchApplicationStatistics = createAsyncThunk<
+  { total: number; pending: number; approved: number; rejected: number },
+  void,
+  { state: RootState; rejectValue: string }
+>('campaign/fetchApplicationStatistics', async (_, { getState, rejectWithValue }) => {
+  try {
+    const state = getState();
+    const token = state.auth.token;
+    
+    if (!token) {
+      throw new Error('User not authenticated');
+    }
+    
+    const response = await GetApplicationStatistics(token);
+    return response.data?.data || response.data || response;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch application statistics';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -416,8 +581,9 @@ export const searchCampaigns = createAsyncThunk<
       status: searchParams.status,
     });
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to search campaigns');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to search campaigns';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -437,8 +603,9 @@ export const fetchCampaignCategories = createAsyncThunk<
     
     const response = await GetCampaignCategories(token);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch categories');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch categories';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -458,8 +625,9 @@ export const fetchCampaignTypes = createAsyncThunk<
     
     const response = await GetCampaignTypes(token);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch types');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch types';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -479,8 +647,9 @@ export const duplicateCampaign = createAsyncThunk<
     
     const response = await DuplicateCampaign(campaignId, token);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to duplicate campaign');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to duplicate campaign';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -500,8 +669,9 @@ export const extendCampaignDeadline = createAsyncThunk<
     
     const response = await ExtendCampaignDeadline(campaignId, newDeadline, token);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to extend deadline');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to extend deadline';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -521,14 +691,15 @@ export const updateCampaignBudget = createAsyncThunk<
     
     const response = await UpdateCampaignBudget(campaignId, newBudget, token);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to update budget');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update budget';
+    return rejectWithValue(errorMessage);
   }
 });
 
 // Fetch campaign analytics
 export const fetchCampaignAnalytics = createAsyncThunk<
-  any,
+  CampaignAnalytics,
   number,
   { state: RootState; rejectValue: string }
 >('campaign/fetchAnalytics', async (campaignId, { getState, rejectWithValue }) => {
@@ -542,8 +713,9 @@ export const fetchCampaignAnalytics = createAsyncThunk<
     
     const response = await GetCampaignAnalytics(campaignId, token);
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to fetch analytics');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch analytics';
+    return rejectWithValue(errorMessage);
   }
 });
 
@@ -574,14 +746,15 @@ export const exportCampaigns = createAsyncThunk<
       brandId: exportParams.brandId,
     });
     return response;
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to export campaigns');
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to export campaigns';
+    return rejectWithValue(errorMessage);
   }
 });
 
 // Approve campaign (admin only)
 export const approveCampaign = createAsyncThunk<
-  { campaignId: number },
+  Campaign,
   number,
   { state: RootState; rejectValue: string }
 >('campaign/approve', async (campaignId, { getState, rejectWithValue }) => {
@@ -595,19 +768,21 @@ export const approveCampaign = createAsyncThunk<
     }
     
     if (user.role !== 'admin') {
-      throw new Error('Only admins can approve campaigns');
+      throw new Error('Acesso negado. Apenas administradores podem aprovar campanhas.');
     }
     
-    await ApproveCampaign(campaignId, token);
-    return { campaignId };
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to approve campaign');
+    const response = await ApproveCampaign(campaignId, token);
+    return response;
+  } catch (error: unknown) {
+    const apiError = handleApiError(error);
+    console.error('Error in approveCampaign:', apiError);
+    return rejectWithValue(apiError.message);
   }
 });
 
 // Reject campaign (admin only)
 export const rejectCampaign = createAsyncThunk<
-  { campaignId: number },
+  Campaign,
   { campaignId: number; reason?: string },
   { state: RootState; rejectValue: string }
 >('campaign/reject', async ({ campaignId, reason }, { getState, rejectWithValue }) => {
@@ -621,12 +796,36 @@ export const rejectCampaign = createAsyncThunk<
     }
     
     if (user.role !== 'admin') {
-      throw new Error('Only admins can reject campaigns');
+      throw new Error('Acesso negado. Apenas administradores podem rejeitar campanhas.');
     }
     
-    await RejectCampaign(campaignId, token, reason);
-    return { campaignId };
-  } catch (error: any) {
-    return rejectWithValue(error.message || 'Failed to reject campaign');
+    const response = await RejectCampaign(campaignId, token, reason);
+    return response;
+  } catch (error: unknown) {
+    const apiError = handleApiError(error);
+    console.error('Error in rejectCampaign:', apiError);
+    return rejectWithValue(apiError.message);
   }
-}); 
+});
+
+// Fetch approved campaigns (for creators)
+export const fetchApprovedCampaigns = createAsyncThunk<
+  Campaign[],
+  void,
+  { state: RootState; rejectValue: string }
+>('campaign/fetchApproved', async (_, { getState, rejectWithValue }) => {
+  try {
+    const state = getState();
+    const token = state.auth.token;
+    
+    if (!token) {
+      throw new Error('User not authenticated');
+    }
+    
+    const response = await GetCampaignsByStatus('approved', token);
+    return response;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch approved campaigns';
+    return rejectWithValue(errorMessage);
+  }
+});

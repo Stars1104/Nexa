@@ -1,26 +1,27 @@
 import React, { useState, useEffect } from "react";
-import { useAppSelector, useAppDispatch } from "../../store/hooks";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { fetchUserProfile } from "../../store/thunks/userThunks";
-import { Card, CardContent } from "../ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { Input } from "../ui/input";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Label } from "../ui/label";
-import { Camera, Edit2, Lock, User, Mail, Building2, Instagram, Pencil, Crown } from "lucide-react";
+import { toast } from "../ui/sonner";
+import { Camera, Edit, Save, X } from "lucide-react";
 
-// Fallback profile data for brands
+// Initial profile data
 const initialProfile = {
-  brandName: "Brand Name",
-  email: "brand@example.com",
-  description: "Brand description not available",
-  phone: "Not specified",
-  website: "Not specified",
-  address: "Not specified",
+  brandName: "",
+  email: "",
+  description: "",
+  phone: "",
+  website: "",
+  address: "",
   avatar: "",
-  companyName: "Company Name",
-  instagram: "@company",
+  companyName: "",
+  instagram: "",
 };
 
 export default function BrandProfile() {
@@ -40,10 +41,17 @@ export default function BrandProfile() {
 
   // Fetch profile data on component mount
   useEffect(() => {
-    if (user && !profile) {
-      dispatch(fetchUserProfile());
-    }
-  }, [dispatch, user, profile]);
+    const fetchProfile = async () => {
+      try {
+        await dispatch(fetchUserProfile()).unwrap();
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        toast.error("Erro ao carregar perfil");
+      }
+    };
+    
+    fetchProfile();
+  }, [dispatch]);
 
   // Merge user data with profile data and fallback to defaults
   const displayProfile = {
@@ -124,276 +132,313 @@ export default function BrandProfile() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#171717] py-10 px-2 md:px-0 flex flex-col items-center">
-      <div className="w-full max-w-full px-10">
-        <h1 className="text-2xl md:text-3xl font-bold mb-1">Meu Perfil</h1>
-        <p className="text-muted-foreground mb-8">Gerencie seu perfil e informações da marca</p>
-        <Card className="p-6 md:p-10">
-          <CardContent className="p-0">
-            {/* Profile Header */}
-            <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start mb-8">
+    <div className="min-h-screen bg-white dark:bg-[#171717] py-10 px-2 md:px-0">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Perfil da Marca
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Gerencie as informações da sua marca
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Avatar Section */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle className="text-lg">Foto do Perfil</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center space-y-4">
               <div className="relative">
-                <Avatar className="w-24 h-24 md:w-28 md:h-28 border-4 border-background shadow-lg">
+                <Avatar className="w-32 h-32">
                   <AvatarImage src={displayProfile.avatar} alt="Profile" />
-                  <AvatarFallback>AB</AvatarFallback>
+                  <AvatarFallback className="text-2xl">
+                    {displayProfile.brandName?.charAt(0)?.toUpperCase() || "M"}
+                  </AvatarFallback>
                 </Avatar>
-                {/* Premium Icon */}
-                {user?.isPremium && (
-                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800">
-                    <Crown className="w-4 h-4 text-white" />
-                  </div>
-                )}
-                {/* Hidden file input for avatar upload */}
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  style={{ display: "none" }}
-                  onChange={handleAvatarChange}
-                />
                 <button
-                  type="button"
-                  className="absolute bottom-0 right-0 bg-pink-500 hover:bg-pink-600 text-white rounded-full p-2 shadow-md border-4 border-background transition-colors"
-                  aria-label="Change profile picture"
                   onClick={handleAvatarClick}
+                  className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors"
                 >
-                  <Camera className="w-5 h-5" />
+                  <Camera className="w-4 h-4" />
                 </button>
               </div>
-              <div className="flex-1 flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl md:text-2xl font-bold">{displayProfile.brandName}</span>
-                  {user?.isPremium && (
-                    <span className="px-3 py-1 text-sm font-medium bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full">
-                      PRO
-                    </span>
-                  )}
-                </div>
-                <span className="text-muted-foreground text-sm md:text-base">
-                  {displayProfile.description}
-                </span>
-              </div>
-            </div>
-            {/* Editable Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
+              <p className="text-sm text-gray-500 text-center">
+                Clique no ícone da câmera para alterar a foto
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Profile Information */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-lg">Informações da Marca</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
               {/* Brand Name */}
-              <div>
-                <Label htmlFor="brandName" className="mb-1 block">Nome completo</Label>
-                <div className="relative flex items-center">
-                  <User className="absolute left-3 text-muted-foreground w-5 h-5" />
+              <div className="space-y-2">
+                <Label htmlFor="brandName">Nome da Marca</Label>
+                <div className="flex items-center space-x-2">
                   {editField === "brandName" ? (
-                    <Input
-                      name="brandName"
-                      value={fieldValues.brandName}
-                      onChange={handleFieldChange}
-                      className="pl-10 pr-10"
-                      autoFocus
-                    />
+                    <>
+                      <Input
+                        id="brandName"
+                        name="brandName"
+                        value={fieldValues.brandName}
+                        onChange={handleFieldChange}
+                        className="flex-1"
+                      />
+                      <Button size="sm" onClick={handleSave}>
+                        <Save className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleCancel}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </>
                   ) : (
-                    <Input
-                      value={displayProfile.brandName}
-                      readOnly
-                      className="pl-10 pr-10 bg-muted/40 cursor-default"
-                    />
+                    <>
+                      <Input
+                        value={displayProfile.brandName}
+                        readOnly
+                        className="flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit("brandName")}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </>
                   )}
-                  <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-accent"
-                    onClick={() => handleEdit("brandName")}
-                    aria-label="Edit brand name"
-                  >
-                    <Pencil className="w-4 h-4 text-pink-500" />
-                  </button>
                 </div>
               </div>
+
               {/* Email */}
-              <div>
-                <Label htmlFor="email" className="mb-1 block">E-mail</Label>
-                <div className="relative flex items-center">
-                  <Mail className="absolute left-3 text-muted-foreground w-5 h-5" />
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="flex items-center space-x-2">
                   {editField === "email" ? (
-                    <Input
-                      name="email"
-                      value={fieldValues.email}
-                      onChange={handleFieldChange}
-                      className="pl-10 pr-10"
-                      autoFocus
-                    />
+                    <>
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={fieldValues.email}
+                        onChange={handleFieldChange}
+                        className="flex-1"
+                      />
+                      <Button size="sm" onClick={handleSave}>
+                        <Save className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleCancel}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </>
                   ) : (
-                    <Input
-                      value={displayProfile.email}
-                      readOnly
-                      className="pl-10 pr-10 bg-muted/40 cursor-default"
-                    />
+                    <>
+                      <Input
+                        value={displayProfile.email}
+                        readOnly
+                        className="flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit("email")}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </>
                   )}
-                  <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-accent"
-                    onClick={() => handleEdit("email")}
-                    aria-label="Edit email"
-                  >
-                    <Pencil className="w-4 h-4 text-pink-500" />
-                  </button>
                 </div>
               </div>
-              {/* Company Name */}
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="description">Descrição</Label>
+                <div className="flex items-start space-x-2">
+                  {editField === "description" ? (
+                    <>
+                      <Textarea
+                        id="description"
+                        name="description"
+                        value={fieldValues.description}
+                        onChange={handleFieldChange}
+                        rows={3}
+                        className="flex-1"
+                      />
+                      <div className="flex flex-col space-y-1">
+                        <Button size="sm" onClick={handleSave}>
+                          <Save className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleCancel}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Textarea
+                        value={displayProfile.description}
+                        readOnly
+                        rows={3}
+                        className="flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit("description")}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Website */}
+              <div className="space-y-2">
+                <Label htmlFor="website">Website</Label>
+                <div className="flex items-center space-x-2">
+                  {editField === "website" ? (
+                    <>
+                      <Input
+                        id="website"
+                        name="website"
+                        value={fieldValues.website}
+                        onChange={handleFieldChange}
+                        className="flex-1"
+                      />
+                      <Button size="sm" onClick={handleSave}>
+                        <Save className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleCancel}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Input
+                        value={displayProfile.website}
+                        readOnly
+                        className="flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit("website")}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Address */}
+              <div className="space-y-2">
+                <Label htmlFor="address">Endereço</Label>
+                <div className="flex items-center space-x-2">
+                  {editField === "address" ? (
+                    <>
+                      <Input
+                        id="address"
+                        name="address"
+                        value={fieldValues.address}
+                        onChange={handleFieldChange}
+                        className="flex-1"
+                      />
+                      <Button size="sm" onClick={handleSave}>
+                        <Save className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleCancel}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Input
+                        value={displayProfile.address}
+                        readOnly
+                        className="flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit("address")}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Password Change Dialog */}
+        <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Alterar Senha</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="companyName" className="mb-1 block">Nome da empresa</Label>
-                <div className="relative flex items-center">
-                  <Building2 className="absolute left-3 text-muted-foreground w-5 h-5" />
-                  {editField === "companyName" ? (
-                    <Input
-                      name="companyName"
-                      value={fieldValues.companyName}
-                      onChange={handleFieldChange}
-                      className="pl-10 pr-10"
-                      autoFocus
-                    />
-                  ) : (
-                    <Input
-                      value={displayProfile.companyName}
-                      readOnly
-                      className="pl-10 pr-10 bg-muted/40 cursor-default"
-                    />
-                  )}
-                  <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-accent"
-                    onClick={() => handleEdit("companyName")}
-                    aria-label="Edit company name"
-                  >
-                    <Pencil className="w-4 h-4 text-pink-500" />
-                  </button>
-                </div>
+                <Label htmlFor="oldPassword">Senha Atual</Label>
+                <Input
+                  id="oldPassword"
+                  name="old"
+                  type="password"
+                  value={passwords.old}
+                  onChange={handlePasswordChange}
+                  required
+                />
               </div>
-              {/* Instagram */}
               <div>
-                <Label htmlFor="instagram" className="mb-1 block">Instagram</Label>
-                <div className="relative flex items-center">
-                  <Instagram className="absolute left-3 text-muted-foreground w-5 h-5" />
-                  {editField === "instagram" ? (
-                    <Input
-                      name="instagram"
-                      value={fieldValues.instagram}
-                      onChange={handleFieldChange}
-                      className="pl-10 pr-10"
-                      autoFocus
-                    />
-                  ) : (
-                    <Input
-                      value={displayProfile.instagram}
-                      readOnly
-                      className="pl-10 pr-10 bg-muted/40 cursor-default"
-                    />
-                  )}
-                  <button
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-accent"
-                    onClick={() => handleEdit("instagram")}
-                    aria-label="Edit instagram"
-                  >
-                    <Pencil className="w-4 h-4 text-pink-500" />
-                  </button>
-                </div>
+                <Label htmlFor="newPassword">Nova Senha</Label>
+                <Input
+                  id="newPassword"
+                  name="new"
+                  type="password"
+                  value={passwords.new}
+                  onChange={handlePasswordChange}
+                  required
+                />
               </div>
-            </div>
-            {/* Brand Description */}
-            <div className="mb-6">
-              <Label htmlFor="description" className="mb-1 block">Descrição da marca</Label>
-              <div className="relative flex items-center">
-                {editField === "description" ? (
-                  <Textarea
-                    name="description"
-                    value={fieldValues.description}
-                    onChange={handleFieldChange}
-                    className="pr-10"
-                    autoFocus
-                  />
-                ) : (
-                  <Textarea
-                    value={displayProfile.description}
-                    readOnly
-                    className="pr-10 bg-muted/40 cursor-default"
-                  />
-                )}
-                <button
-                  className="absolute right-2 top-2 p-1 rounded hover:bg-accent"
-                  onClick={() => handleEdit("description")}
-                  aria-label="Edit description"
+              <div>
+                <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirm"
+                  type="password"
+                  value={passwords.confirm}
+                  onChange={handlePasswordChange}
+                  required
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowPasswordDialog(false)}
                 >
-                  <Pencil className="w-4 h-4 text-pink-500" />
-                </button>
+                  Cancelar
+                </Button>
+                <Button type="submit">Salvar</Button>
               </div>
-            </div>
-            {/* Edit Actions */}
-            {editField && (
-              <div className="flex gap-2 mb-6">
-                <Button variant="secondary" onClick={handleSave}>Salvar</Button>
-                <Button variant="ghost" onClick={handleCancel}>Cancelar</Button>
-              </div>
-            )}
-            {/* Password Change Tag/Button */}
-            <div className="flex justify-end">
-              <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="flex items-center gap-2 border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/30 border-2"
-                  >
-                    <Lock className="w-4 h-4" />
-                    Alterar a senha
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Alterar a senha</DialogTitle>
-                    <DialogDescription>Atualize a senha da sua conta abaixo.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                    <div>
-                      <Label htmlFor="old">Senha atual</Label>
-                      <Input
-                        id="old"
-                        name="old"
-                        type="password"
-                        value={passwords.old}
-                        onChange={handlePasswordChange}
-                        required
-                        autoComplete="current-password"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="new">Nova Senha</Label>
-                      <Input
-                        id="new"
-                        name="new"
-                        type="password"
-                        value={passwords.new}
-                        onChange={handlePasswordChange}
-                        required
-                        autoComplete="new-password"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="confirm">Confirmar nova senha</Label>
-                      <Input
-                        id="confirm"
-                        name="confirm"
-                        type="password"
-                        value={passwords.confirm}
-                        onChange={handlePasswordChange}
-                        required
-                        autoComplete="new-password"
-                      />
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit" variant="secondary">Atualizar senha</Button>
-                      <DialogClose asChild>
-                        <Button type="button" variant="ghost">Cancelar</Button>
-                      </DialogClose>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardContent>
-        </Card>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

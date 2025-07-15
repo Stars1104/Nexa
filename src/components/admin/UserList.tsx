@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import ReactDOM from "react-dom";
+import { createPortal } from "react-dom";
 import {
     Select,
     SelectTrigger,
@@ -139,6 +139,13 @@ export default function UserList() {
         }
         document.addEventListener('mousedown', handle);
         return () => document.removeEventListener('mousedown', handle);
+    }, []);
+
+    // Cleanup on unmount
+    React.useEffect(() => {
+        return () => {
+            setOpenDropdown(null);
+        };
     }, []);
 
     // Helper to open dropdown and set position
@@ -355,7 +362,7 @@ export default function UserList() {
                     </div>
 
                     {/* Dropdown Portal */}
-                    {openDropdown && triggerRefs.current[openDropdown] && ReactDOM.createPortal(
+                    {openDropdown && triggerRefs.current[openDropdown] && typeof document !== 'undefined' && createPortal(
                         <div
                             className="fixed z-50 bg-background border border-gray-200 dark:border-neutral-700 rounded shadow-md min-w-[120px]"
                             style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}

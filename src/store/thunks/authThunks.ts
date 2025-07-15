@@ -1,6 +1,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { loginStart, loginSuccess, loginFailure, signupStart, signupSuccess, signupFailure, logout } from '../slices/authSlice';
 import { signup, signin, logout as logoutAPI, updatePassword } from '../../api/auth';
+import { handleApiError } from '../../lib/api-error-handler';
 
 interface LoginCredentials {
   email: string;
@@ -54,10 +55,10 @@ export const signupUser = createAsyncThunk(
       };
       dispatch(signupSuccess(authData));
       return authData;
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Sign up failed';
-      dispatch(signupFailure(errorMessage));
-      return rejectWithValue(errorMessage);
+    } catch (error: unknown) {
+      const apiError = handleApiError(error);
+      dispatch(signupFailure(apiError.message));
+      return rejectWithValue(apiError.message);
     }
   }
 );
@@ -82,10 +83,10 @@ export const loginUser = createAsyncThunk(
 
       dispatch(loginSuccess(authData));
       return authData;
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Login failed';
-      dispatch(loginFailure(errorMessage));
-      return rejectWithValue(errorMessage);
+    } catch (error: unknown) {
+      const apiError = handleApiError(error);
+      dispatch(loginFailure(apiError.message));
+      return rejectWithValue(apiError.message);
     }
   }
 );
@@ -122,9 +123,9 @@ export const updateUserPassword = createAsyncThunk(
       }
 
       return response.message || 'Password updated successfully';
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.message || error?.message || 'Password update failed';
-      return rejectWithValue(errorMessage);
+    } catch (error: unknown) {
+      const apiError = handleApiError(error);
+      return rejectWithValue(apiError.message);
     }
   }
 );

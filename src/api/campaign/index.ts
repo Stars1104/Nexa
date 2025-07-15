@@ -9,6 +9,23 @@ const CampaignAPI = axios.create({
     },
 });
 
+// Response interceptor to handle common HTTP errors
+CampaignAPI.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            console.warn('Authentication failed - token may be expired');
+        } else if (error.response?.status === 403) {
+            console.warn('Access forbidden - user may not have required permissions');
+        } else if (error.response?.status === 404) {
+            console.warn('Resource not found');
+        } else if (error.response?.status >= 500) {
+            console.error('Server error:', error.response?.status, error.response?.statusText);
+        }
+        return Promise.reject(error);
+    }
+);
+
 // Add token to requests
 const setAuthToken = (token: string) => {
     if (token) {
@@ -21,7 +38,7 @@ const setAuthToken = (token: string) => {
 // Create new campaign
 export const CreateNewCampaign = async (data: FormData, token: string) => {
     setAuthToken(token);
-    
+
     // Create a new axios instance for form data
     const FormDataAPI = axios.create({
         baseURL: `${BackendURL}`,
@@ -46,15 +63,28 @@ export const CreateNewCampaign = async (data: FormData, token: string) => {
 // Get all campaigns
 export const GetAllCampaigns = async (token: string) => {
     setAuthToken(token);
-    const response = await CampaignAPI.get("/api/campaigns/get-campaigns");
+    const response = await CampaignAPI.get("/api/campaigns/get-all-campaigns");
     return response.data;
 };
 
 // Get pending campaigns (for admin)
 export const GetPendingCampaigns = async (token: string) => {
     setAuthToken(token);
-    const response = await CampaignAPI.get("/api/campaigns/pending");
-    return response.data;
+    try {
+        const response = await CampaignAPI.get("/api/campaigns/pending");
+        return response.data;
+    } catch (error: any) {
+        console.error("Error fetching pending campaigns:", error);
+        if (error.response?.status === 403) {
+            throw new Error("Acesso negado. Você não tem permissão para acessar campanhas pendentes.");
+        } else if (error.response?.status === 401) {
+            throw new Error("Sessão expirada. Por favor, faça login novamente.");
+        } else if (error.response?.status >= 500) {
+            throw new Error("Erro do servidor. Tente novamente mais tarde.");
+        } else {
+            throw new Error(error.response?.data?.message || "Erro ao carregar campanhas pendentes");
+        }
+    }
 };
 
 // Get user campaigns (for brands)
@@ -102,16 +132,49 @@ export const GetCampaignStats = async (token: string) => {
 // Approve campaign (admin only)
 export const ApproveCampaign = async (campaignId: number, token: string) => {
     setAuthToken(token);
-    const response = await CampaignAPI.patch(`/api/campaigns/${campaignId}/approve`);
-    return response.data;
+    try {
+        // Send an empty object as request body to satisfy backend validation
+        const response = await CampaignAPI.patch(`/api/campaigns/${campaignId}/approve`, {});
+        return response.data;
+    } catch (error: any) {
+        console.error("Error approving campaign:", error);
+        console.error("Error response data:", error.response?.data);
+        console.error("Error response status:", error.response?.status);
+        if (error.response?.status === 403) {
+            throw new Error("Acesso negado. Você não tem permissão para aprovar campanhas.");
+        } else if (error.response?.status === 401) {
+            throw new Error("Sessão expirada. Por favor, faça login novamente.");
+        } else if (error.response?.status === 404) {
+            throw new Error("Campanha não encontrada.");
+        } else if (error.response?.status >= 500) {
+            throw new Error("Erro do servidor. Tente novamente mais tarde.");
+        } else {
+            throw new Error(error.response?.data?.message || "Erro ao aprovar campanha");
+        }
+    }
 };
 
 // Reject campaign (admin only)
 export const RejectCampaign = async (campaignId: number, token: string, reason?: string) => {
     setAuthToken(token);
-    const data = reason ? { reason } : {};
-    const response = await CampaignAPI.patch(`/api/campaigns/${campaignId}/reject`, data);
-    return response.data;
+    try {
+        const data = reason ? { reason } : {};
+        const response = await CampaignAPI.patch(`/api/campaigns/${campaignId}/reject`, data);
+        return response.data;
+    } catch (error: any) {
+        console.error("Error rejecting campaign:", error);
+        if (error.response?.status === 403) {
+            throw new Error("Acesso negado. Você não tem permissão para rejeitar campanhas.");
+        } else if (error.response?.status === 401) {
+            throw new Error("Sessão expirada. Por favor, faça login novamente.");
+        } else if (error.response?.status === 404) {
+            throw new Error("Campanha não encontrada.");
+        } else if (error.response?.status >= 500) {
+            throw new Error("Erro do servidor. Tente novamente mais tarde.");
+        } else {
+            throw new Error(error.response?.data?.message || "Erro ao rejeitar campanha");
+        }
+    }
 };
 
 // Archive campaign (admin only)
@@ -152,35 +215,38 @@ export const DeleteCampaign = async (campaignId: number, token: string) => {
     return response.data;
 };
 
-// Apply to campaign (for creators)
+// Apply to campaign (for creators) - Updated to match backend API
 export const ApplyToCampaign = async (campaignId: number, applicationData: {
-    message: string;
-    portfolio?: File;
-    proposedDeadline?: string;
-    proposedBudget?: number;
+  proposal: string;
+  portfolio_links?: string[];
+  estimated_delivery_days?: number;
+  proposed_budget?: number;
 }, token: string) => {
     setAuthToken(token);
     
-    const formData = new FormData();
-    formData.append('message', applicationData.message);
-    if (applicationData.proposedDeadline) {
-        formData.append('proposedDeadline', applicationData.proposedDeadline);
-    }
-    if (applicationData.proposedBudget) {
-        formData.append('proposedBudget', applicationData.proposedBudget.toString());
-    }
-    if (applicationData.portfolio) {
-        formData.append('portfolio', applicationData.portfolio);
-    }
+    const response = await CampaignAPI.post(`/api/campaigns/${campaignId}/applications`, applicationData);
+    return response.data;
+};
+
+// Get all applications (role-based)
+export const GetAllApplications = async (token: string, filters?: {
+  status?: string;
+  campaign_id?: number;
+}) => {
+    setAuthToken(token);
+    const params = new URLSearchParams();
     
-    const FormDataAPI = axios.create({
-        baseURL: `${BackendURL}`,
-        headers: {
-            "Authorization": `Bearer ${token}`
-        },
-    });
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.campaign_id) params.append('campaign_id', filters.campaign_id.toString());
     
-    const response = await FormDataAPI.post(`/api/campaigns/${campaignId}/apply`, formData);
+    const response = await CampaignAPI.get(`/api/applications?${params.toString()}`);
+    return response.data;
+};
+
+// Get specific application
+export const GetApplication = async (applicationId: number, token: string) => {
+    setAuthToken(token);
+    const response = await CampaignAPI.get(`/api/applications/${applicationId}`);
     return response.data;
 };
 
@@ -192,24 +258,38 @@ export const GetCampaignApplications = async (campaignId: number, token: string)
 };
 
 // Approve application (for brands)
-export const ApproveApplication = async (campaignId: number, applicationId: number, token: string) => {
+export const ApproveApplication = async (applicationId: number, token: string) => {
     setAuthToken(token);
-    const response = await CampaignAPI.patch(`/api/campaigns/${campaignId}/applications/${applicationId}/approve`);
+    const response = await CampaignAPI.post(`/api/applications/${applicationId}/approve`);
     return response.data;
 };
 
 // Reject application (for brands)
-export const RejectApplication = async (campaignId: number, applicationId: number, token: string, reason?: string) => {
+export const RejectApplication = async (applicationId: number, token: string, rejectionReason?: string) => {
     setAuthToken(token);
-    const data = reason ? { reason } : {};
-    const response = await CampaignAPI.patch(`/api/campaigns/${campaignId}/applications/${applicationId}/reject`, data);
+    const data = rejectionReason ? { rejection_reason: rejectionReason } : {};
+    const response = await CampaignAPI.post(`/api/applications/${applicationId}/reject`, data);
     return response.data;
 };
 
-// Get creator applications (for creators)
+// Withdraw application (for creators)
+export const WithdrawApplication = async (applicationId: number, token: string) => {
+    setAuthToken(token);
+    const response = await CampaignAPI.delete(`/api/applications/${applicationId}/withdraw`);
+    return response.data;
+};
+
+// Get application statistics
+export const GetApplicationStatistics = async (token: string) => {
+    setAuthToken(token);
+    const response = await CampaignAPI.get(`/api/applications/statistics`);
+    return response.data;
+};
+
+// Get creator applications (for creators) - Updated to use new endpoint
 export const GetCreatorApplications = async (token: string) => {
     setAuthToken(token);
-    const response = await CampaignAPI.get("/api/campaigns/applications/my");
+    const response = await CampaignAPI.get(`/api/applications`);
     return response.data;
 };
 

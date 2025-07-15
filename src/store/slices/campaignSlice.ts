@@ -23,7 +23,12 @@ import {
   extendCampaignDeadline,
   updateCampaignBudget,
   fetchCampaignAnalytics,
-  exportCampaigns
+  exportCampaigns,
+  fetchApprovedCampaigns,
+  withdrawApplication,
+  fetchAllApplications,
+  fetchApplication,
+  fetchApplicationStatistics
 } from '../thunks/campaignThunks';
 
 export interface Campaign {
@@ -43,6 +48,7 @@ export interface Campaign {
   };
   brandId: string;
   type: string;
+  category?: string;
   value: number;
   status: 'pending' | 'approved' | 'rejected' | 'archived';
   submissionDate: string;
@@ -66,15 +72,46 @@ export interface CampaignFormData {
 
 export interface Application {
   id: number;
-  campaignId: number;
-  creatorId: string;
-  creatorName: string;
-  message: string;
+  campaign_id: number;
+  creator_id: number;
   status: 'pending' | 'approved' | 'rejected';
-  proposedDeadline?: string;
-  proposedBudget?: number;
-  portfolio?: string;
-  appliedAt: string;
+  proposal: string;
+  portfolio_links?: string[];
+  estimated_delivery_days?: number;
+  proposed_budget?: number;
+  rejection_reason?: string;
+  reviewed_by?: number;
+  reviewed_at?: string;
+  approved_at?: string;
+  created_at: string;
+  updated_at: string;
+  campaign?: {
+    id: number;
+    title: string;
+    description: string;
+    brand: {
+      id: number;
+      name: string;
+    };
+  };
+  creator?: {
+    id: number;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
+  reviewer?: {
+    id: number;
+    name: string;
+  } | null;
+  chat?: {
+    id: number;
+    campaign_id: number;
+    brand_id: number;
+    creator_id: number;
+    status: string;
+    created_at: string;
+  } | null;
 }
 
 interface CampaignState {
@@ -82,6 +119,7 @@ interface CampaignState {
   pendingCampaigns: Campaign[];
   userCampaigns: Campaign[];
   availableCampaigns: Campaign[];
+  approvedCampaigns: Campaign[];
   searchResults: Campaign[];
   applications: Application[];
   creatorApplications: Application[];
@@ -101,6 +139,7 @@ const initialState: CampaignState = {
   pendingCampaigns: [],
   userCampaigns: [],
   availableCampaigns: [],
+  approvedCampaigns: [],
   searchResults: [],
   applications: [],
   creatorApplications: [],
@@ -139,8 +178,9 @@ const campaignSlice = createSlice({
       })
       .addCase(createCampaign.fulfilled, (state, action) => {
         state.isCreating = false;
-        state.userCampaigns.push(action.payload);
-        state.pendingCampaigns.push(action.payload);
+        // Use immutable updates to prevent DOM manipulation issues
+        state.userCampaigns = [...state.userCampaigns, action.payload];
+        state.pendingCampaigns = [...state.pendingCampaigns, action.payload];
       })
       .addCase(createCampaign.rejected, (state, action) => {
         state.isCreating = false;
@@ -182,7 +222,7 @@ const campaignSlice = createSlice({
       })
       .addCase(fetchUserCampaigns.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.userCampaigns = action.payload;
+        state.userCampaigns = Array.isArray(action.payload) ? action.payload : Object.values(action.payload);
       })
       .addCase(fetchUserCampaigns.rejected, (state, action) => {
         state.isLoading = false;
@@ -201,6 +241,20 @@ const campaignSlice = createSlice({
       .addCase(fetchAvailableCampaigns.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload || 'Failed to fetch available campaigns';
+      })
+      
+      // Fetch approved campaigns
+      .addCase(fetchApprovedCampaigns.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchApprovedCampaigns.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.approvedCampaigns = action.payload;
+      })
+      .addCase(fetchApprovedCampaigns.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Failed to fetch approved campaigns';
       })
       
       // Fetch campaign stats
@@ -240,6 +294,11 @@ const campaignSlice = createSlice({
         state.isLoading = false;
         const updatedCampaign = action.payload;
         
+        // Ensure all arrays are properly initialized
+        if (!Array.isArray(state.approvedCampaigns)) {
+          state.approvedCampaigns = [];
+        }
+        
         // Update campaign in all arrays
         state.campaigns = state.campaigns.map(campaign =>
           campaign.id === updatedCampaign.id ? updatedCampaign : campaign
@@ -251,6 +310,9 @@ const campaignSlice = createSlice({
           campaign.id === updatedCampaign.id ? updatedCampaign : campaign
         );
         state.availableCampaigns = state.availableCampaigns.map(campaign =>
+          campaign.id === updatedCampaign.id ? updatedCampaign : campaign
+        );
+        state.approvedCampaigns = state.approvedCampaigns.map(campaign =>
           campaign.id === updatedCampaign.id ? updatedCampaign : campaign
         );
         
@@ -272,11 +334,17 @@ const campaignSlice = createSlice({
         state.isLoading = false;
         const campaignId = action.payload.campaignId;
         
+        // Ensure approvedCampaigns is an array
+        if (!Array.isArray(state.approvedCampaigns)) {
+          state.approvedCampaigns = [];
+        }
+        
         // Remove campaign from all arrays
         state.campaigns = state.campaigns.filter(campaign => campaign.id !== campaignId);
         state.pendingCampaigns = state.pendingCampaigns.filter(campaign => campaign.id !== campaignId);
         state.userCampaigns = state.userCampaigns.filter(campaign => campaign.id !== campaignId);
         state.availableCampaigns = state.availableCampaigns.filter(campaign => campaign.id !== campaignId);
+        state.approvedCampaigns = state.approvedCampaigns.filter(campaign => campaign.id !== campaignId);
         
         if (state.selectedCampaign?.id === campaignId) {
           state.selectedCampaign = null;
@@ -338,6 +406,14 @@ const campaignSlice = createSlice({
         state.isLoading = false;
         const { campaignId, applicationId } = action.payload;
         
+        // Ensure arrays are properly initialized
+        if (!Array.isArray(state.applications)) {
+          state.applications = [];
+        }
+        if (!Array.isArray(state.creatorApplications)) {
+          state.creatorApplications = [];
+        }
+        
         // Update application status
         state.applications = state.applications.map(app =>
           app.id === applicationId ? { ...app, status: 'approved' } : app
@@ -359,6 +435,14 @@ const campaignSlice = createSlice({
       .addCase(rejectApplication.fulfilled, (state, action) => {
         state.isLoading = false;
         const { campaignId, applicationId } = action.payload;
+        
+        // Ensure arrays are properly initialized
+        if (!Array.isArray(state.applications)) {
+          state.applications = [];
+        }
+        if (!Array.isArray(state.creatorApplications)) {
+          state.creatorApplications = [];
+        }
         
         // Update application status
         state.applications = state.applications.map(app =>
@@ -422,8 +506,9 @@ const campaignSlice = createSlice({
       })
       .addCase(duplicateCampaign.fulfilled, (state, action) => {
         state.isCreating = false;
-        state.userCampaigns.push(action.payload);
-        state.pendingCampaigns.push(action.payload);
+        // Use immutable updates to prevent DOM manipulation issues
+        state.userCampaigns = [...state.userCampaigns, action.payload];
+        state.pendingCampaigns = [...state.pendingCampaigns, action.payload];
       })
       .addCase(duplicateCampaign.rejected, (state, action) => {
         state.isCreating = false;
@@ -438,6 +523,11 @@ const campaignSlice = createSlice({
       .addCase(extendCampaignDeadline.fulfilled, (state, action) => {
         state.isLoading = false;
         const updatedCampaign = action.payload;
+        
+        // Ensure approvedCampaigns is an array
+        if (!Array.isArray(state.approvedCampaigns)) {
+          state.approvedCampaigns = [];
+        }
         
         // Update campaign in all arrays
         state.campaigns = state.campaigns.map(campaign =>
@@ -470,6 +560,11 @@ const campaignSlice = createSlice({
       .addCase(updateCampaignBudget.fulfilled, (state, action) => {
         state.isLoading = false;
         const updatedCampaign = action.payload;
+        
+        // Ensure approvedCampaigns is an array
+        if (!Array.isArray(state.approvedCampaigns)) {
+          state.approvedCampaigns = [];
+        }
         
         // Update campaign in all arrays
         state.campaigns = state.campaigns.map(campaign =>
@@ -529,15 +624,23 @@ const campaignSlice = createSlice({
       })
       .addCase(approveCampaign.fulfilled, (state, action) => {
         state.isLoading = false;
-        const campaignId = action.payload.campaignId;
+        const approvedCampaign = action.payload;
+        
+        // Ensure approvedCampaigns is an array
+        if (!Array.isArray(state.approvedCampaigns)) {
+          state.approvedCampaigns = [];
+        }
         
         // Update campaign status in all arrays
         state.campaigns = state.campaigns.map(campaign =>
-          campaign.id === campaignId ? { ...campaign, status: 'approved' } : campaign
+          campaign.id === approvedCampaign.id ? { ...campaign, status: 'approved' } : campaign
         );
-        state.pendingCampaigns = state.pendingCampaigns.filter(campaign => campaign.id !== campaignId);
+        state.pendingCampaigns = state.pendingCampaigns.filter(campaign => campaign.id !== approvedCampaign.id);
         state.userCampaigns = state.userCampaigns.map(campaign =>
-          campaign.id === campaignId ? { ...campaign, status: 'approved' } : campaign
+          campaign.id === approvedCampaign.id ? { ...campaign, status: 'approved' } : campaign
+        );
+        state.approvedCampaigns = state.approvedCampaigns.map(campaign =>
+          campaign.id === approvedCampaign.id ? { ...campaign, status: 'approved' } : campaign
         );
       })
       .addCase(approveCampaign.rejected, (state, action) => {
@@ -552,20 +655,96 @@ const campaignSlice = createSlice({
       })
       .addCase(rejectCampaign.fulfilled, (state, action) => {
         state.isLoading = false;
-        const campaignId = action.payload.campaignId;
+        const rejectedCampaign = action.payload;
+        
+        // Ensure approvedCampaigns is an array
+        if (!Array.isArray(state.approvedCampaigns)) {
+          state.approvedCampaigns = [];
+        }
         
         // Update campaign status in all arrays
         state.campaigns = state.campaigns.map(campaign =>
-          campaign.id === campaignId ? { ...campaign, status: 'rejected' } : campaign
+          campaign.id === rejectedCampaign.id ? { ...campaign, status: 'rejected' } : campaign
         );
-        state.pendingCampaigns = state.pendingCampaigns.filter(campaign => campaign.id !== campaignId);
+        state.pendingCampaigns = state.pendingCampaigns.filter(campaign => campaign.id !== rejectedCampaign.id);
         state.userCampaigns = state.userCampaigns.map(campaign =>
-          campaign.id === campaignId ? { ...campaign, status: 'rejected' } : campaign
+          campaign.id === rejectedCampaign.id ? { ...campaign, status: 'rejected' } : campaign
+        );
+        state.approvedCampaigns = state.approvedCampaigns.map(campaign =>
+          campaign.id === rejectedCampaign.id ? { ...campaign, status: 'rejected' } : campaign
         );
       })
       .addCase(rejectCampaign.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload || 'Failed to reject campaign';
+      })
+      
+      // Withdraw application
+      .addCase(withdrawApplication.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(withdrawApplication.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const applicationId = action.payload;
+        
+        // Remove application from arrays
+        state.applications = state.applications.filter(app => app.id !== applicationId);
+        state.creatorApplications = state.creatorApplications.filter(app => app.id !== applicationId);
+      })
+      .addCase(withdrawApplication.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Failed to withdraw application';
+      })
+      
+      // Fetch all applications
+      .addCase(fetchAllApplications.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchAllApplications.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.applications = action.payload;
+      })
+      .addCase(fetchAllApplications.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Failed to fetch applications';
+      })
+      
+      // Fetch specific application
+      .addCase(fetchApplication.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchApplication.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Update or add the application to the arrays
+        const application = action.payload;
+        const existingIndex = state.applications.findIndex(app => app.id === application.id);
+        if (existingIndex >= 0) {
+          state.applications[existingIndex] = application;
+        } else {
+          state.applications.push(application);
+        }
+      })
+      .addCase(fetchApplication.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Failed to fetch application';
+      })
+      
+      // Fetch application statistics
+      .addCase(fetchApplicationStatistics.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchApplicationStatistics.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Store statistics in stats object
+        state.stats = { ...state.stats, applications: action.payload };
+      })
+      .addCase(fetchApplicationStatistics.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Failed to fetch application statistics';
       });
   },
 });

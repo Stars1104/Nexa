@@ -4,6 +4,7 @@ import { useIsMobile } from "../../hooks/use-mobile";
 import { useState } from "react";
 import BrandSidebar from "../../components/brand/BrandSidebar";
 import BrandDashboard from "../../components/brand/BrandDashboard";
+import AllowedCampaigns from "../../components/brand/AllowedCampaigns";
 import BrandProfile from "@/components/brand/BrandProfile";
 import NotFound from "../NotFound";
 import Chat from "@/components/Chat";
@@ -16,28 +17,32 @@ import Notification from "@/components/Notification";
 const Index = () => {
     const isMobile = useIsMobile();
 
-    const [component, setComponent] = useState<string | null>("Minhas campanhas");
+    const [component, setComponent] = useState<string | { name: string; campaign: any }>("Minhas campanhas");
 
     const CreatorComponent = () => {
-        switch (component) {
-            case "Minhas campanhas":
-                return <BrandDashboard setComponent={setComponent} />;
-            case "Meu perfil":
-                return <BrandProfile />;
-            case "Chat":
-                return <Chat />
-            case "Ver criadores":
-                return <ViewCreators setComponent={setComponent} />
-            case "Ver aplicação":
-                return <ViewApplication setComponent={setComponent} />
-            case "Nova campanha":
-                return <CreateCampaign />
-            case "Pagamentos":
-                return <Payment />
-            case "Notificações":
-                return <Notification />
-            default:
-                return <NotFound />;
+        if (typeof component === "string") {
+            switch (component) {
+                case "Minhas campanhas":
+                    return <AllowedCampaigns setComponent={setComponent} />;
+                case "Meu perfil":
+                    return <BrandProfile />;
+                case "Chat":
+                    return <Chat />
+                case "Nova campanha":
+                    return <CreateCampaign />
+                case "Pagamentos":
+                    return <Payment />
+                case "Notificações":
+                    return <Notification />
+                default:
+                    return <NotFound />;
+            }
+        } else if (typeof component === "object" && component.name === "Ver aplicação") {
+            return <ViewApplication setComponent={setComponent} campaign={component.campaign} />;
+        } else if (typeof component === "object" && component.name === "Ver criadores") {
+            return <ViewCreators setComponent={setComponent} campaignId={component.campaign?.id} campaignTitle={component.campaign?.title} />;
+        } else {
+            return <NotFound />;
         }
     }
 
@@ -46,7 +51,7 @@ const Index = () => {
             <div className="flex h-screen bg-background text-foreground">
                 {!isMobile && <BrandSidebar setComponent={setComponent} component={component} />}
                 <div className="flex-1 flex flex-col min-w-0">
-                    <ComponentNavbar title={component || "Dashboard"} />
+                    <ComponentNavbar title={typeof component === "string" ? component : component?.name || "Dashboard"} />
                     <main className={`flex-1 overflow-y-auto bg-muted/50 ${isMobile ? 'pb-20' : ''}`}>
                         <CreatorComponent />
                     </main>

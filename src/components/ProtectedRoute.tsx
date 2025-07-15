@@ -16,10 +16,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, token, user } = useAppSelector((state) => state.auth);
   const location = useLocation();
 
-  // If not authenticated or no token, redirect to signin page
+  // If not authenticated or no token, redirect to auth page
   if (!isAuthenticated || !token) {
     // Store the current location so we can redirect back after login
-    return <Navigate to="/auth/login" state={{ from: location }} replace />;
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   // If user exists and role-based access is specified

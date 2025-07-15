@@ -5,7 +5,7 @@ import { Badge } from "./ui/badge";
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Separator } from "./ui/separator";
-import ReactDOM from "react-dom";
+import { createPortal } from "react-dom";
 import { useAppSelector, useAppDispatch } from "../store/hooks";
 import { logoutUser } from "../store/thunks/authThunks";
 import { useNavigate } from "react-router-dom";
@@ -71,6 +71,14 @@ const CreatorNavbar = ({ title }: CreatorNavbarProps) => {
     };
   }, [showNotifications, showUserMenu]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      setShowNotifications(false);
+      setShowUserMenu(false);
+    };
+  }, []);
+
   // Mock notification data
   const notifications = [
     {
@@ -120,7 +128,7 @@ const CreatorNavbar = ({ title }: CreatorNavbarProps) => {
           </button>
 
           {/* Notification Dropdown */}
-          {showNotifications && ReactDOM.createPortal(
+          {showNotifications && typeof document !== 'undefined' && createPortal(
             <div className="fixed right-4 top-16 w-80 bg-background border rounded-lg shadow-lg z-[2147483647] dark:bg-[#171717]">
               <Card>
                 <CardContent className="p-0">

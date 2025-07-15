@@ -16,7 +16,7 @@ const navLinks = [
 
 interface SidebarProps {
     setComponent: (component: string) => void;
-    component?: string;
+    component?: string | { name: string; campaign?: any };
 }
 
 const Sidebar = ({ setComponent, component }: SidebarProps) => {

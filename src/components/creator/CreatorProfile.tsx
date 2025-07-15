@@ -39,10 +39,17 @@ export const CreatorProfile = () => {
 
     // Fetch profile data on component mount
     useEffect(() => {
-        if (user && !profile) {
-            dispatch(fetchUserProfile());
-        }
-    }, [dispatch, user, profile]);
+        const fetchProfile = async () => {
+            try {
+                await dispatch(fetchUserProfile()).unwrap();
+            } catch (error) {
+                console.error('Error fetching profile:', error);
+                toast.error("Erro ao carregar perfil");
+            }
+        };
+        
+        fetchProfile();
+    }, [dispatch]);
 
     // Merge user data with profile data and fallback to defaults
     const displayProfile = {
