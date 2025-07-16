@@ -41,6 +41,10 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       state.user = action.payload.user;
       state.token = action.payload.token;
+      
+      // Also store in localStorage as backup
+      localStorage.setItem('token', action.payload.token);
+      localStorage.setItem('user', JSON.stringify(action.payload.user));
     },
     loginFailure: (state, action: PayloadAction<string>) => {
       state.isLoading = false;
@@ -56,6 +60,10 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       state.user = action.payload.user;
       state.token = action.payload.token;
+      
+      // Also store in localStorage as backup
+      localStorage.setItem('token', action.payload.token);
+      localStorage.setItem('user', JSON.stringify(action.payload.user));
     },
     signupFailure: (state, action: PayloadAction<string>) => {
       state.isSigningUp = false;
@@ -65,6 +73,10 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
+      
+      // Clear localStorage as well
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
     },
     clearError: (state) => {
       state.error = null;

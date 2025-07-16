@@ -11,6 +11,7 @@ import { fetchPendingCampaigns, approveCampaign, rejectCampaign } from "../../st
 import { clearError } from "../../store/slices/campaignSlice";
 import CampaignDetail from "@/components/admin/CampaignDetail";
 import { Campaign } from "../../store/slices/campaignSlice";
+import CampaignLogo from "../ui/CampaignLogo";
 
 export default function PendingCampaign() {
     const dispatch = useDispatch<AppDispatch>();
@@ -81,7 +82,7 @@ export default function PendingCampaign() {
         setProcessingIds(prev => new Set(prev).add(id));
         
         try {
-            const result = await dispatch(approveCampaign(id)).unwrap();
+            await dispatch(approveCampaign(id)).unwrap();
             // Add a small delay to prevent toast from interfering with DOM updates
             const timeoutId = setTimeout(() => {
                 toast.success("Campanha aprovada com sucesso!");
@@ -114,7 +115,7 @@ export default function PendingCampaign() {
         setProcessingIds(prev => new Set(prev).add(id));
         
         try {
-            const result = await dispatch(rejectCampaign({ campaignId: id, reason: "Rejeitado pelo administrador" })).unwrap();
+            await dispatch(rejectCampaign({ campaignId: id, reason: "Rejeitado pelo administrador" })).unwrap();
             // Add a small delay to prevent toast from interfering with DOM updates
             const timeoutId = setTimeout(() => {
                 toast.success("Campanha rejeitada com sucesso!");
@@ -249,25 +250,19 @@ export default function PendingCampaign() {
                         </Alert>
                     )}
 
-                    {campaignsToDisplay.map((campaign, index) => (
+                    {campaignsToDisplay.map((campaign : any) => (
                         <Card key={`campaign-${campaign.id}-${campaign.status}-${processingIds.has(campaign.id)}`} className="p-0 border bg-background text-foreground shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex flex-col gap-2 sm:gap-0 sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-6">
                                 <div className="flex flex-col gap-1 w-full">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg overflow-hidden">
-                                            {campaign.logo ? (
-                                                 <img 
-                                                     src={`http://localhost:8000${campaign.logo}`}
-                                                     alt={`${campaign.brand.name} logo`}
-                                                     className="w-full h-full object-cover"
-                                                 />
-                                            ) : (
-                                                campaign.brand?.name?.charAt(0)?.toUpperCase() || 'N'
-                                            )}
-                                        </div>
+                                        <CampaignLogo 
+                                            logo={campaign.logo}
+                                            brandName={campaign.brand?.name || 'Brand'}
+                                            size="md"
+                                        />
                                         <div>
                                             <CardTitle className="text-lg sm:text-xl text-foreground">{campaign.title}</CardTitle>
-                                            <p className="text-sm text-muted-foreground">por {campaign.brand?.name || 'Marca não especificada'}</p>
+                                            <p className="text-sm text-muted-foreground">{campaign.brand?.name || 'Marca não especificada'}</p>
                                         </div>
                                     </div>
                                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm text-muted-foreground mt-2">
@@ -276,10 +271,10 @@ export default function PendingCampaign() {
                                                 <span className="font-medium text-foreground">Valor:</span> R$ {campaign.budget?.toLocaleString("pt-BR") || campaign.value?.toLocaleString("pt-BR")}
                                             </span>
                                             <span>
-                                                <span className="font-medium text-foreground">Prazo:</span> {campaign.deadline ? new Date(campaign.deadline).toLocaleDateString("pt-BR") : 'Prazo não definido'}
+                                                <span className="font-medium text-foreground">Prazo:</span> {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString("pt-BR") : 'Prazo não definido'}
                                             </span>
                                             <span>
-                                                <span className="font-medium text-foreground">Estados:</span> {Array.isArray(campaign.states) ? campaign.states.join(", ") : (campaign.states || 'Não especificado')}
+                                                <span className="font-medium text-foreground">Estados:</span> {campaign.deadline ? new Date(campaign.deadline).toLocaleDateString("pt-BR") : 'Prazo não definido'}
                                             </span>
                                         </div>
                                     </div>
@@ -300,22 +295,10 @@ export default function PendingCampaign() {
                                         <span className="block text-sm font-medium text-foreground mb-1">Descrição</span>
                                         <p className="text-sm text-muted-foreground">{campaign.description}</p>
                                     </div>
-                                    {campaign.briefing && (
-                                        <div>
-                                            <span className="block text-sm font-medium text-foreground mb-1">Briefing</span>
-                                            <p className="text-sm text-muted-foreground line-clamp-2">{campaign.briefing}</p>
-                                        </div>
-                                    )}
-                                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                        <span>Submetido em: {campaign.submissionDate ? new Date(campaign.submissionDate).toLocaleDateString("pt-BR") : 'Data não disponível'}</span>
-                                        {campaign.creatorRequirements && campaign.creatorRequirements.length > 0 && (
-                                            <span>• Requisitos: {Array.isArray(campaign.creatorRequirements) ? campaign.creatorRequirements.join(", ") : String(campaign.creatorRequirements)}</span>
-                                        )}
-                                    </div>
                                 </div>
                             </CardContent>
                             
-                            <CardFooter className="flex flex-col sm:flex-row sm:justify-end gap-2 px-4 sm:px-6 pb-4">
+                            <CardFooter className="flex flex-col sm:flex-row sm:justify-end gap-2 px-4 sm:px-6 pb-4 mt-4">
                                 <Button
                                     variant="outline"
                                     size="sm"

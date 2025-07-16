@@ -197,7 +197,7 @@ export const fetchUserCampaigns = createAsyncThunk<
     }
     
     const response = await GetUserCampaigns(user.id, token);
-    return Array.isArray(response) ? response : Object.values(response);
+    return response.data || response;
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user campaigns';
     return rejectWithValue(errorMessage);

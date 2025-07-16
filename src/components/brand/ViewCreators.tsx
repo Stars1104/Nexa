@@ -83,7 +83,7 @@ const ViewCreators: React.FC<ViewCreatorsProps> = ({ setComponent, campaignId, c
           return (
             <div
               key={app.id}
-              className="bg-white dark:bg-neutral-800 rounded-xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4 border border-gray-100 dark:border-neutral-700 cursor-pointer hover:shadow-md transition"
+              className="bg-background rounded-xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-6 gap-4 border border-gray-100 dark:border-neutral-700 cursor-pointer hover:shadow-md transition"
               onClick={() => { setSelectedApp(app); setSidebarOpen(true); }}
             >
               {/* User Info */}
@@ -104,19 +104,6 @@ const ViewCreators: React.FC<ViewCreatorsProps> = ({ setComponent, campaignId, c
                   <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-300">
                     {/* Follower count if available */}
                     {creator.followers && <span>{creator.followers} seguidores</span>}
-                    <span className="hidden sm:inline">·</span>
-                    {creator.id && (
-                      <a
-                        href={`/profile/${creator.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-pink-500 hover:underline flex items-center gap-1 ml-2"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        Ver perfil
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M15 3h6v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 14L21 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </a>
-                    )}
                   </div>
                   <div className="mt-2">
                     {status === 'pending' && (

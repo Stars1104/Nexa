@@ -1,0 +1,122 @@
+import { apiClient } from './apiClient';
+
+export interface ChatRoom {
+    id: number;
+    room_id: string;
+    campaign_id: number;
+    campaign_title: string;
+    other_user: {
+        id: number;
+        name: string;
+        avatar?: string;
+        online: boolean;
+    };
+    last_message?: {
+        id: number;
+        message: string;
+        message_type: string;
+        sender_id: number;
+        is_sender: boolean;
+        created_at: string;
+    };
+    unread_count: number;
+    last_message_at?: string;
+}
+
+export interface Message {
+    id: number;
+    message: string;
+    message_type: 'text' | 'file' | 'image';
+    sender_id: number;
+    sender_name: string;
+    sender_avatar?: string;
+    is_sender: boolean;
+    file_path?: string;
+    file_name?: string;
+    file_size?: string;
+    file_type?: string;
+    file_url?: string;
+    formatted_file_size?: string;
+    is_read: boolean;
+    read_at?: string;
+    created_at: string;
+}
+
+export interface ChatRoomResponse {
+    room: {
+        id: number;
+        room_id: string;
+        campaign_id: number;
+        campaign_title: string;
+    };
+    messages: Message[];
+}
+
+class ChatService {
+    // Get user's chat rooms
+    async getChatRooms(): Promise<ChatRoom[]> {
+        try {
+            const response = await apiClient.get('/chat/rooms');
+            return response.data.data;
+        } catch (error) {
+            console.error('Error fetching chat rooms:', error);
+            throw error;
+        }
+    }
+
+    // Get messages for a specific chat room
+    async getMessages(roomId: string): Promise<ChatRoomResponse> {
+        const response = await apiClient.get(`/chat/rooms/${roomId}/messages`);
+        return response.data.data;
+    }
+
+    // Send a text message
+    async sendTextMessage(roomId: string, message: string): Promise<Message> {
+        const response = await apiClient.post('/chat/messages', {
+            room_id: roomId,
+            message,
+        });
+        return response.data.data;
+    }
+
+    // Send a file message
+    async sendFileMessage(roomId: string, file: File): Promise<Message> {
+        const formData = new FormData();
+        formData.append('room_id', roomId);
+        formData.append('file', file);
+
+        const response = await apiClient.post('/chat/messages', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data.data;
+    }
+
+    // Create a chat room (when brand accepts creator proposal)
+    async createChatRoom(campaignId: number, creatorId: number): Promise<{ room_id: string }> {
+        const response = await apiClient.post('/chat/rooms', {
+            campaign_id: campaignId,
+            creator_id: creatorId,
+        });
+        return response.data.data;
+    }
+
+    // Update online status
+    async updateOnlineStatus(isOnline: boolean, socketId?: string): Promise<void> {
+        await apiClient.post('/chat/online-status', {
+            is_online: isOnline,
+            socket_id: socketId,
+        });
+    }
+
+    // Update typing status
+    async updateTypingStatus(roomId: string, isTyping: boolean): Promise<void> {
+        await apiClient.post('/chat/typing-status', {
+            room_id: roomId,
+            is_typing: isTyping,
+        });
+    }
+}
+
+export const chatService = new ChatService(); 

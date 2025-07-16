@@ -168,6 +168,26 @@ const campaignSlice = createSlice({
     clearSearchResults: (state) => {
       state.searchResults = [];
     },
+    // Clear all campaign data
+    clearAllCampaignData: (state) => {
+      state.campaigns = [];
+      state.pendingCampaigns = [];
+      state.userCampaigns = [];
+      state.availableCampaigns = [];
+      state.approvedCampaigns = [];
+      state.searchResults = [];
+      state.applications = [];
+      state.creatorApplications = [];
+      state.categories = [];
+      state.types = [];
+      state.stats = null;
+      state.analytics = null;
+      state.selectedCampaign = null;
+      state.error = null;
+      state.isLoading = false;
+      state.isCreating = false;
+      state.isSearching = false;
+    },
   },
   extraReducers: (builder) => {
     // Create campaign
@@ -222,7 +242,7 @@ const campaignSlice = createSlice({
       })
       .addCase(fetchUserCampaigns.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.userCampaigns = Array.isArray(action.payload) ? action.payload : Object.values(action.payload);
+        state.userCampaigns = action.payload;
       })
       .addCase(fetchUserCampaigns.rejected, (state, action) => {
         state.isLoading = false;
@@ -753,6 +773,7 @@ export const {
   clearError,
   setSelectedCampaign,
   clearSearchResults,
+  clearAllCampaignData,
 } = campaignSlice.actions;
 
 export default campaignSlice.reducer; 

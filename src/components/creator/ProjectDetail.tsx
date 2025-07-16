@@ -64,7 +64,29 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ setComponent, projectId  
                         <div className="flex justify-end mb-2">
                             <span className="text-xs text-primary bg-primary/10 dark:bg-primary/20 rounded px-3 py-1 font-medium">{project.category}</span>
                         </div>
-                        <h1 className="text-2xl md:text-3xl font-bold mb-8 text-foreground">{project.title}</h1>
+                        <div className="flex items-center gap-4 mb-8">
+                            {/* Campaign Logo */}
+                            <div className="flex-shrink-0">
+                                {project.logo ? (
+                                    <img
+                                        src={`http://localhost:8000${project.logo}`}
+                                        alt={`${project.title} logo`}
+                                        className="w-16 h-16 rounded-xl object-cover border border-border"
+                                        onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.style.display = 'none';
+                                            target.nextElementSibling?.classList.remove('hidden');
+                                        }}
+                                    />
+                                ) : null}
+                                {(!project.logo || project.logo === '') && (
+                                    <div className="w-16 h-16 rounded-xl border border-border flex items-center justify-center text-2xl font-bold text-white bg-gradient-to-br from-primary to-primary/80">
+                                        {project.title.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
+                            </div>
+                            <h1 className="text-2xl md:text-3xl font-bold text-foreground">{project.title}</h1>
+                        </div>
 
                         <div className="mb-7">
                             <h2 className="font-bold text-[17px] mb-1 text-foreground">Descrição</h2>

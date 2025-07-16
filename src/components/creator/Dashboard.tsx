@@ -16,10 +16,13 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Calendar } from "../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { CalendarIcon, Filter, X } from "lucide-react";
+import { CalendarIcon, Filter, X, Search, Eye, Clock, MapPin, DollarSign, Users, Star, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { fetchCreatorApplications } from "../../store/thunks/campaignThunks";
+import CampaignCard from "./CampaignCard";
+import CampaignStats from "./CampaignStats";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../ui/card";
 
 // Stats will be calculated dynamically based on approved campaigns
 
@@ -34,6 +37,9 @@ const categories = [
     "Story",
     "Reels",
     "Post",
+    "Live",
+    "Podcast",
+    "Blog",
 ];
 
 // Estados brasileiros por nome
@@ -78,14 +84,20 @@ interface FilterState {
     dateFrom: Date | undefined;
     dateTo: Date | undefined;
     sort: string;
+    search: string;
+    budgetMin: string;
+    budgetMax: string;
 }
 
 const statesColors = [
-  "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-200",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-200",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-200",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-200",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-200",
+    "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200",
+    "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200",
+    "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200",
+    "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200",
+    "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-200",
+    "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200",
+    "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-200",
+    "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200",
 ];
 
 export default function Dashboard({ setComponent, setProjectId }: DashboardProps) {
@@ -93,6 +105,8 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
     const { approvedCampaigns, isLoading, error } = useAppSelector((state) => state.campaign);
     const { creatorApplications } = useAppSelector((state) => state.campaign);
     const { user } = useAppSelector((state) => state.auth);
+
+    console.log(approvedCampaigns);
     
     // Filter state
     const [filters, setFilters] = useState<FilterState>({
@@ -100,7 +114,10 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
         region: "all",
         dateFrom: undefined,
         dateTo: undefined,
-        sort: "sort-by"
+        sort: "newest-first",
+        search: "",
+        budgetMin: "",
+        budgetMax: "",
     });
 
     // Filter panel state
@@ -140,7 +157,10 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
             region: "all",
             dateFrom: undefined,
             dateTo: undefined,
-            sort: "sort-by"
+            sort: "newest-first",
+            search: "",
+            budgetMin: "",
+            budgetMax: "",
         });
     };
 
@@ -148,11 +168,30 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
     const hasActiveFilters = filters.category !== "all" || 
                            filters.region !== "all" || 
                            filters.dateFrom || 
-                           filters.dateTo;
+                           filters.dateTo ||
+                           filters.search ||
+                           filters.budgetMin ||
+                           filters.budgetMax;
 
     // Filter and sort campaigns
     const filteredAndSortedCampaigns = campaigns
         .filter(campaign => {
+            // Search filter
+            if (filters.search) {
+                const searchTerm = filters.search.toLowerCase();
+                const title = campaign.title?.toLowerCase() || "";
+                const description = campaign.description?.toLowerCase() || "";
+                const brandName = campaign.brand?.name?.toLowerCase() || "";
+                const category = campaign.category?.toLowerCase() || campaign.type?.toLowerCase() || "";
+                
+                if (!title.includes(searchTerm) && 
+                    !description.includes(searchTerm) && 
+                    !brandName.includes(searchTerm) &&
+                    !category.includes(searchTerm)) {
+                    return false;
+                }
+            }
+
             // Category filter
             if (filters.category !== "all") {
                 const campaignCategory = campaign.category?.toLowerCase() || campaign.type?.toLowerCase() || "";
@@ -163,7 +202,6 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
 
             // Region filter
             if (filters.region !== "all") {
-                // Split campaign.location string into array, trim spaces
                 const campaignLocations = typeof campaign.location === "string"
                     ? campaign.location.split(",").map(loc => loc.trim())
                     : Array.isArray(campaign.location)
@@ -172,6 +210,14 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
                 if (!campaignLocations.some(loc => loc.toUpperCase() === filters.region.toUpperCase())) {
                     return false;
                 }
+            }
+
+            // Budget range filter
+            if (filters.budgetMin && campaign.budget < parseFloat(filters.budgetMin)) {
+                return false;
+            }
+            if (filters.budgetMax && campaign.budget > parseFloat(filters.budgetMax)) {
+                return false;
             }
 
             // Date range filter
@@ -202,7 +248,9 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
                 case "deadline-latest":
                     return new Date(b.deadline).getTime() - new Date(a.deadline).getTime();
                 case "newest-first":
-                    return new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime();
+                    return new Date(b.created_at || b.submissionDate).getTime() - new Date(a.created_at || a.submissionDate).getTime();
+                case "oldest-first":
+                    return new Date(a.created_at || a.submissionDate).getTime() - new Date(b.created_at || b.submissionDate).getTime();
                 default:
                     return 0;
             }
@@ -222,12 +270,30 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
         }).format(budget);
     };
 
-    // Calculate stats dynamically
-    const stats = [
-        { label: "CAMPANHAS DISPONÍVEIS", value: campaigns.length },
-        { label: "CAMPANHAS ATIVAS", value: 1 }, // Pode ser calculado a partir das aplicações
-        { label: "GANHOS DO MÊS", value: "R$ 750" }, // Pode ser calculado a partir das campanhas concluídas
-    ];
+    // Calculate days until deadline
+    const getDaysUntilDeadline = (deadline: string) => {
+        const deadlineDate = new Date(deadline);
+        const today = new Date();
+        const diffTime = deadlineDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+    };
+
+    // Get deadline status
+    const getDeadlineStatus = (deadline: string) => {
+        const days = getDaysUntilDeadline(deadline);
+        if (days < 0) return { status: 'expired', text: 'Expirado', color: 'text-red-600 bg-red-100' };
+        if (days <= 3) return { status: 'urgent', text: `${days} dias`, color: 'text-orange-600 bg-orange-100' };
+        if (days <= 7) return { status: 'soon', text: `${days} dias`, color: 'text-yellow-600 bg-yellow-100' };
+        return { status: 'normal', text: `${days} dias`, color: 'text-green-600 bg-green-100' };
+    };
+
+    // Calculate enhanced stats
+    const activeOpportunities = campaigns.filter(c => getDaysUntilDeadline(c.deadline) > 0).length;
+    const averageBudget = campaigns.length > 0 ? campaigns.reduce((sum, c) => sum + c.budget, 0) / campaigns.length : 0;
+    const approvedApplications = creatorApplications.filter(app => app.status === 'approved').length;
+    const successRate = creatorApplications.length > 0 ? Math.round((approvedApplications / creatorApplications.length) * 100) : 0;
+    const totalEarnings = approvedApplications * averageBudget; // Simplified calculation
 
     useEffect(() => {
         if (user?.role === 'creator') {
@@ -240,32 +306,36 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
             {/* Welcome */}
             <div className="flex flex-col gap-2">
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold flex items-center gap-2">
-                    Bem-vinda, Luiza Costa <span>👋</span>
+                    Bem-vinda, {user?.name || 'Criador'} <span>👋</span>
                 </h2>
                 <p className="text-sm sm:text-base text-muted-foreground mt-1">
-                    Descubra novas campanhas e comece a criar!
+                    Descubra novas campanhas e comece a criar conteúdo incrível!
                 </p>
             </div>
             
-            {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {stats.map((stat) => (
-                    <div
-                        key={stat.label}
-                        className="rounded-xl border bg-card p-4 sm:p-6 flex flex-col gap-2 shadow-sm"
-                    >
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            {stat.label}
-                        </span>
-                        <span className="text-xl sm:text-2xl lg:text-3xl font-bold">
-                            {stat.value}
-                        </span>
-                    </div>
-                ))}
-            </div>
+            {/* Enhanced Stats */}
+            <CampaignStats
+                totalCampaigns={campaigns.length}
+                myApplications={creatorApplications.length}
+                activeOpportunities={activeOpportunities}
+                totalEarnings={totalEarnings}
+                averageBudget={averageBudget}
+                successRate={successRate}
+            />
             
-            {/* Filters */}
+            {/* Search and Filters */}
             <div className="space-y-4">
+                {/* Search Bar */}
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                        placeholder="Buscar campanhas por título, descrição, marca ou categoria..."
+                        value={filters.search}
+                        onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                        className="pl-10 h-12"
+                    />
+                </div>
+
                 {/* Filter Toggle and Quick Actions */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 justify-between">
                     <div className="flex items-center gap-2 w-full justify-between">
@@ -276,14 +346,17 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
                             className="flex items-center gap-2"
                         >
                             <Filter className="h-4 w-4" />
-                            Filtros
+                            Filtros Avançados
                             {hasActiveFilters && (
                                 <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
                                     {[
                                         filters.category !== "all" ? 1 : 0,
                                         filters.region !== "all" ? 1 : 0,
                                         filters.dateFrom ? 1 : 0,
-                                        filters.dateTo ? 1 : 0
+                                        filters.dateTo ? 1 : 0,
+                                        filters.search ? 1 : 0,
+                                        filters.budgetMin ? 1 : 0,
+                                        filters.budgetMax ? 1 : 0
                                     ].reduce((a, b) => a + b, 0)}
                                 </span>
                             )}
@@ -296,18 +369,31 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
                                 className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
                             >
                                 <X className="h-4 w-4" />
-                                Limpar
+                                Limpar Filtros
                             </Button>
                         )}
+                        <Select value={filters.sort} onValueChange={(value) => setFilters(prev => ({ ...prev, sort: value }))}>
+                            <SelectTrigger className="w-[180px] h-9">
+                                <SelectValue placeholder="Ordenar por" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="newest-first">Mais recentes</SelectItem>
+                                <SelectItem value="oldest-first">Mais antigas</SelectItem>
+                                <SelectItem value="price-high-to-low">Maior orçamento</SelectItem>
+                                <SelectItem value="price-low-to-high">Menor orçamento</SelectItem>
+                                <SelectItem value="deadline-soonest">Prazo próximo</SelectItem>
+                                <SelectItem value="deadline-latest">Prazo distante</SelectItem>
+                            </SelectContent>
+                        </Select>
                         <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-[140px] h-9 ml-2">
+                            <SelectTrigger className="w-[140px] h-9">
                                 <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">Todos</SelectItem>
-                                <SelectItem value="approved">Aprovados</SelectItem>
-                                <SelectItem value="rejected">Rejeitados</SelectItem>
+                                <SelectItem value="all">Todas</SelectItem>
                                 <SelectItem value="pending">Pendentes</SelectItem>
+                                <SelectItem value="approved">Aprovadas</SelectItem>
+                                <SelectItem value="rejected">Rejeitadas</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -315,119 +401,149 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
 
                 {/* Advanced Filters Panel */}
                 {showFilters && (
-                    <div className="bg-card border rounded-lg p-4 space-y-4">
-                        <h3 className="font-semibold text-sm">Filtros Avançados</h3>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {/* Category Filter */}
-                            <div className="space-y-2">
-                                <Label htmlFor="category-filter" className="text-xs font-medium">
-                                    Categoria
-                                </Label>
-                                <Select 
-                                    value={filters.category} 
-                                    onValueChange={(value) => setFilters(prev => ({ ...prev, category: value }))}
-                                >
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="Todas as categorias" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {categories.map((category) => (
-                                            <SelectItem key={category} value={category.toLowerCase().replace(/\s+/g, '-')}> {/* Mantém o valor em minúsculo para filtro */}
-                                                {category}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                    <Card className="border-2">
+                        <CardHeader>
+                            <CardTitle className="text-lg">Filtros Avançados</CardTitle>
+                            <CardDescription>
+                                Refine sua busca para encontrar as campanhas ideais
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {/* Category Filter */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="category-filter" className="text-xs font-medium">
+                                        Categoria
+                                    </Label>
+                                    <Select 
+                                        value={filters.category} 
+                                        onValueChange={(value) => setFilters(prev => ({ ...prev, category: value }))}
+                                    >
+                                        <SelectTrigger className="h-9">
+                                            <SelectValue placeholder="Todas as categorias" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {categories.map((category) => (
+                                                <SelectItem key={category} value={category.toLowerCase().replace(/\s+/g, '-')}>
+                                                    {category}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-                            {/* Region Filter */}
-                            <div className="space-y-2">
-                                <Label htmlFor="region-filter" className="text-xs font-medium">
-                                    Estado
-                                </Label>
-                                <Select 
-                                    value={filters.region} 
-                                    onValueChange={(value) => setFilters(prev => ({ ...prev, region: value }))}
-                                >
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="Todos os estados" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Todos os estados</SelectItem>
-                                        {brazilianStates.map((state) => (
-                                            <SelectItem key={state} value={state}>
-                                                {state}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                                {/* Region Filter */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="region-filter" className="text-xs font-medium">
+                                        Estado
+                                    </Label>
+                                    <Select 
+                                        value={filters.region} 
+                                        onValueChange={(value) => setFilters(prev => ({ ...prev, region: value }))}
+                                    >
+                                        <SelectTrigger className="h-9">
+                                            <SelectValue placeholder="Todos os estados" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">Todos os estados</SelectItem>
+                                            {brazilianStates.map((state) => (
+                                                <SelectItem key={state} value={state}>
+                                                    {state}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-                            {/* Date From Filter */}
-                            <div className="space-y-2">
-                                <Label className="text-xs font-medium">Data Inicial</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            className="w-full justify-start text-left font-normal h-9"
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {filters.dateFrom ? (
-                                                format(filters.dateFrom, "PPP", { locale: ptBR })
-                                            ) : (
-                                                <span className="text-muted-foreground">Escolha uma data</span>
-                                            )}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={filters.dateFrom}
-                                            onSelect={(date) => setFilters(prev => ({ ...prev, dateFrom: date }))}
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
+                                {/* Budget Min Filter */}
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-medium">Orçamento Mínimo</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="R$ 0"
+                                        value={filters.budgetMin}
+                                        onChange={(e) => setFilters(prev => ({ ...prev, budgetMin: e.target.value }))}
+                                        className="h-9"
+                                    />
+                                </div>
 
-                            {/* Date To Filter */}
-                            <div className="space-y-2">
-                                <Label className="text-xs font-medium">Data Final</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            className="w-full justify-start text-left font-normal h-9"
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {filters.dateTo ? (
-                                                format(filters.dateTo, "PPP", { locale: ptBR })
-                                            ) : (
-                                                <span className="text-muted-foreground">Escolha uma data</span>
-                                            )}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={filters.dateTo}
-                                            onSelect={(date) => setFilters(prev => ({ ...prev, dateTo: date }))}
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                {/* Budget Max Filter */}
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-medium">Orçamento Máximo</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="R$ 10.000"
+                                        value={filters.budgetMax}
+                                        onChange={(e) => setFilters(prev => ({ ...prev, budgetMax: e.target.value }))}
+                                        className="h-9"
+                                    />
+                                </div>
+
+                                {/* Date From Filter */}
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-medium">Data Inicial</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                className="w-full justify-start text-left font-normal h-9"
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {filters.dateFrom ? (
+                                                    format(filters.dateFrom, "PPP", { locale: ptBR })
+                                                ) : (
+                                                    <span className="text-muted-foreground">Escolha uma data</span>
+                                                )}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                                mode="single"
+                                                selected={filters.dateFrom}
+                                                onSelect={(date) => setFilters(prev => ({ ...prev, dateFrom: date }))}
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+
+                                {/* Date To Filter */}
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-medium">Data Final</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                className="w-full justify-start text-left font-normal h-9"
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {filters.dateTo ? (
+                                                    format(filters.dateTo, "PPP", { locale: ptBR })
+                                                ) : (
+                                                    <span className="text-muted-foreground">Escolha uma data</span>
+                                                )}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                                mode="single"
+                                                selected={filters.dateTo}
+                                                onSelect={(date) => setFilters(prev => ({ ...prev, dateTo: date }))}
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
                 )}
             </div>
             
             {/* Campaigns */}
             <div>
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
-                    <h3 className="text-lg sm:text-xl lg:text-2xl font-semibold">Campanhas Aprovadas</h3>
+                    <h3 className="text-lg sm:text-xl lg:text-2xl font-semibold">Campanhas Disponíveis</h3>
                     {filteredAndSortedCampaigns.length > 0 && (
                         <span className="text-sm text-muted-foreground">
                             {filteredAndSortedCampaigns.length} de {campaigns.length} campanhas
@@ -438,41 +554,66 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
                 {isLoading ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                         {[...Array(8)].map((_, i) => (
-                            <div key={i} className="rounded-xl border bg-card p-4 sm:p-5 flex flex-col gap-3 shadow-sm">
-                                <Skeleton className="h-4 w-3/4" />
-                                <Skeleton className="h-3 w-1/2" />
-                                <div className="flex gap-2">
-                                    <Skeleton className="h-6 w-20" />
-                                    <Skeleton className="h-6 w-24" />
-                                </div>
-                                <div className="flex justify-between items-center mt-auto">
-                                    <Skeleton className="h-6 w-16" />
-                                    <Skeleton className="h-9 w-24" />
-                                </div>
-                            </div>
+                            <Card key={i} className="overflow-hidden">
+                                <CardHeader className="pb-3">
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-3 w-1/2" />
+                                </CardHeader>
+                                <CardContent className="pb-3">
+                                    <div className="flex gap-2 mb-3">
+                                        <Skeleton className="h-6 w-20" />
+                                        <Skeleton className="h-6 w-24" />
+                                    </div>
+                                    <Skeleton className="h-16 w-full" />
+                                </CardContent>
+                                <CardFooter>
+                                    <div className="flex justify-between items-center w-full">
+                                        <Skeleton className="h-6 w-16" />
+                                        <Skeleton className="h-9 w-24" />
+                                    </div>
+                                </CardFooter>
+                            </Card>
                         ))}
                     </div>
                 ) : filteredAndSortedCampaigns.length === 0 ? (
-                    <div className="text-center py-12">
-                        {hasActiveFilters ? (
-                            <>
-                                <p className="text-muted-foreground text-lg">Nenhuma campanha corresponde aos filtros atuais.</p>
-                                <p className="text-muted-foreground text-sm mt-2">Tente ajustar os filtros ou limpe-os para ver todas as campanhas.</p>
-                                <Button 
-                                    variant="outline" 
-                                    onClick={clearFilters}
-                                    className="mt-4"
-                                >
-                                    Limpar Filtros
-                                </Button>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-muted-foreground text-lg">Nenhuma campanha aprovada disponível no momento.</p>
-                                <p className="text-muted-foreground text-sm mt-2">Volte mais tarde para novas oportunidades!</p>
-                            </>
-                        )}
-                    </div>
+                    <Card className="text-center py-12">
+                        <CardContent>
+                            {hasActiveFilters ? (
+                                <>
+                                    <div className="mb-4">
+                                        <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                        <h3 className="text-lg font-semibold mb-2">Nenhuma campanha encontrada</h3>
+                                        <p className="text-muted-foreground text-sm mb-4">
+                                            Nenhuma campanha corresponde aos filtros atuais.
+                                        </p>
+                                        <p className="text-muted-foreground text-sm mb-6">
+                                            Tente ajustar os filtros ou limpe-os para ver todas as campanhas.
+                                        </p>
+                                    </div>
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={clearFilters}
+                                        className="mx-auto"
+                                    >
+                                        Limpar Filtros
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="mb-4">
+                                        <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                        <h3 className="text-lg font-semibold mb-2">Nenhuma campanha disponível</h3>
+                                        <p className="text-muted-foreground text-sm mb-4">
+                                            Não há campanhas aprovadas disponíveis no momento.
+                                        </p>
+                                        <p className="text-muted-foreground text-sm">
+                                            Volte mais tarde para novas oportunidades!
+                                        </p>
+                                    </div>
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                         {filteredAndSortedCampaigns
@@ -484,77 +625,17 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
                             })
                             .map((campaign : any) => {
                                 const myApp = user?.role === 'creator' ? creatorApplications.find(app => app.campaign_id === campaign.id && app.creator_id === user.id) : null;
-                                let badge = null;
-                                let button = null;
-                                if (myApp) {
-                                    if (myApp.status === 'approved') {
-                                        badge = <span className="ml-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">Aprovado</span>;
-                                        button = (
-                                                <a href={`#`} className="w-full sm:w-auto">
-                                                    <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base">Chat</Button>
-                                                </a>
-                                            );
-                                    } else if (myApp.status === 'rejected') {
-                                        badge = <span className="ml-2 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">Rejeitado</span>;
-                                        button = (
-                                            <Button className="w-full sm:w-auto bg-gray-400 text-white text-sm sm:text-base cursor-not-allowed" disabled>Rejeitado</Button>
-                                        );
-                                    } else {
-                                        badge = <span className="ml-2 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">Aplicado</span>;
-                                        button = (
-                                            <Button className="w-full sm:w-auto bg-[#E91E63] hover:bg-[#E91E63]/80 text-white text-sm sm:text-base" onClick={() => {
-                                                setComponent("Detalhes do Projeto");
-                                                setProjectId(campaign.id);
-                                            }}>
-                                                Ver detalhes
-                                            </Button>
-                                        );
-                                    }
-                                } else {
-                                    button = (
-                                        <Button className="w-full sm:w-auto bg-[#E91E63] hover:bg-[#E91E63]/80 text-white text-sm sm:text-base" onClick={() => {
-                                            setComponent("Detalhes do Projeto");
-                                            setProjectId(campaign.id);
-                                        }}>
-                                            Ver detalhes
-                                        </Button>
-                                    );
-                                }
+                                
                                 return (
-                                    <div
+                                    <CampaignCard
                                         key={campaign.id}
-                                        className="rounded-xl border bg-card p-4 sm:p-5 flex flex-col gap-3 shadow-sm relative"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="font-semibold text-sm sm:text-base pr-16 sm:pr-20">{campaign.title}</div>
-                                            {badge}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground mb-1">Marca: {campaign.brand?.name || 'N/A'}</div>
-                                        <div className="text-xs text-muted-foreground mb-1">Descrição: {campaign.description.length > 100 ? campaign.description.slice(0, 100) + '...' : campaign.description}</div>
-                                        {/* States/Location badges styled as in the image */}
-                                        <div className="flex flex-wrap gap-2 mb-2">
-                                            {campaign.location && campaign.location.split(',').map((uf: string, i: number) => (
-                                                <span
-                                                key={uf.trim()}
-                                                className={`px-2 py-1 rounded-full text-xs font-medium ${statesColors[i % statesColors.length]}`}
-                                                >
-                                                {uf.trim()}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs mb-3">
-                                            <div className="text-xs text-blue-600 dark:text-blue-300 bg-[#EFF6FF] dark:bg-[#151515] rounded-full px-2 py-1 w-fit">
-                                                {campaign.category || campaign.type}
-                                            </div>
-                                            <div className="text-yellow-600 dark:text-yellow-300 bg-[#FFFBEB] dark:bg-[#151515] rounded-full px-2 py-1 w-fit">
-                                                Até {formatDate(campaign.deadline)}
-                                            </div>
-                                        </div>
-                                        <div className="w-full flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-auto">
-                                            <div className="font-bold text-lg sm:text-xl">{formatBudget(campaign.budget)}</div>
-                                            {button}
-                                        </div>
-                                    </div>
+                                        campaign={campaign}
+                                        userApplication={myApp}
+                                        onViewDetails={(campaignId) => {
+                                            setComponent("Detalhes do Projeto");
+                                            setProjectId(campaignId);
+                                        }}
+                                    />
                                 );
                             })}
                     </div>

@@ -77,11 +77,11 @@ const AllowedCampaigns: React.FC<AllowedCampaignsProps> = ({ setComponent }) => 
     }, [dispatch, error]);
 
     // Calculate pagination
-    const totalCampaigns = userCampaigns.length;
+    const totalCampaigns = userCampaigns?.length || 0;
     const totalPages = Math.ceil(totalCampaigns / campaignsPerPage);
     const startIndex = (currentPage - 1) * campaignsPerPage;
     const endIndex = startIndex + campaignsPerPage;
-    const currentCampaigns = userCampaigns.slice(startIndex, endIndex);
+    const currentCampaigns = userCampaigns?.slice(startIndex, endIndex) || [];
 
     // Format date for display
     const formatDate = (dateString: string) => {
@@ -280,7 +280,7 @@ const AllowedCampaigns: React.FC<AllowedCampaignsProps> = ({ setComponent }) => 
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                        {currentCampaigns[1].map((campaign : any, index: number) => (
+                        {currentCampaigns.map((campaign : any, index: number) => (
                             <div
                                 key={index}
                                 className="bg-background rounded-xl shadow-sm border border-mute p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"

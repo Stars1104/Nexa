@@ -1,5 +1,3 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card";
-import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { CheckCircle2, Calendar, Lightbulb } from "lucide-react";
 import { useTheme } from "../ThemeProvider";
