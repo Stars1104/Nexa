@@ -8,21 +8,34 @@ const AuthAPI = axios.create({
     headers: {
         "Content-Type": "application/json",
     },
+    withCredentials: false, // Don't send cookies for API requests
 });
 
 // Request interceptor to add token dynamically
 AuthAPI.interceptors.request.use(
     (config) => {
-        // Get token from Redux store if available
-        const token = getTokenFromStore();
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+        // Don't add Authorization header for login/register requests
+        if (config.url && (config.url.includes('/login') || config.url.includes('/register'))) {
+            console.log('Login/Register request - skipping Authorization header');
+        } else {
+            // Get token from Redux store if available
+            const token = getTokenFromStore();
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
         }
         
         // Handle FormData properly - don't set Content-Type for FormData
         if (config.data instanceof FormData) {
             delete config.headers['Content-Type'];
         }
+        
+        console.log('Request config:', {
+            url: config.url,
+            method: config.method,
+            headers: config.headers,
+            data: config.data
+        });
         
         return config;
     },
@@ -113,7 +126,28 @@ export const healthCheck = async () => {
 // Signin Function
 export const signin = async (data: any) => {
     try {
-        const response = await AuthAPI.post("/api/login", data);
+        console.log('Sending login request with data:', data);
+        console.log('Data type:', typeof data);
+        console.log('Data stringified:', JSON.stringify(data));
+        
+        // First try the debug endpoint to see what's being sent
+        try {
+            const debugResponse = await AuthAPI.post("/api/debug-login", data);
+            console.log('Debug endpoint response:', debugResponse.data);
+        } catch (debugError: any) {
+            console.log('Debug endpoint error:', debugError.response?.data);
+        }
+        
+        // Try with explicit JSON stringification
+        const jsonData = JSON.stringify(data);
+        console.log('Sending JSON data:', jsonData);
+        
+        const response = await AuthAPI.post("/api/login", jsonData, {
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        console.log('Login response:', response.data);
         return response.data;
     } catch (error: any) {
         console.error('Login error details:', {

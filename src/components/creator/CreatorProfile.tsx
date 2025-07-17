@@ -190,7 +190,7 @@ export const CreatorProfile = () => {
     if (!user?.id) {
         return (
             <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] flex items-center justify-center">
-                <div className="text-gray-500 dark:text-gray-400">Please log in to view your profile</div>
+                <div className="text-gray-500 dark:text-gray-400">Por favor, faça login para ver seu perfil</div>
             </div>
         );
     }
@@ -198,7 +198,7 @@ export const CreatorProfile = () => {
     if (isLoading) {
         return (
             <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] flex items-center justify-center">
-                <div className="text-gray-500 dark:text-gray-400">Loading profile...</div>
+                <div className="text-gray-500 dark:text-gray-400">Carregando perfil...</div>
             </div>
         );
     }
@@ -206,7 +206,7 @@ export const CreatorProfile = () => {
     if (error) {
         return (
             <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] flex items-center justify-center">
-                <div className="text-red-500">Error loading profile: {error}</div>
+                <div className="text-red-500">Erro ao carregar perfil: {error}</div>
             </div>
         );
     }
@@ -224,14 +224,14 @@ export const CreatorProfile = () => {
                             <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
                             <div className="flex-1">
                                 <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                    Please Subscribe to Premium
+                                    Assine o Premium
                                 </h3>
                                 <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                                    Unlock premium features and enhance your creator experience
+                                    Desbloqueie recursos premium e melhore sua experiência como criador
                                 </p>
                             </div>
                             <button className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm font-medium rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200">
-                                Upgrade Now
+                                Fazer Upgrade
                             </button>
                         </div>
                     </div>
@@ -239,7 +239,7 @@ export const CreatorProfile = () => {
 
                 <div className="bg-background rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-6">
                     <div className="flex justify-between items-start mb-6">
-                        <span className="font-semibold text-base text-gray-900 dark:text-white">Profile Information</span>
+                        <span className="font-semibold text-base text-gray-900 dark:text-white">Informações do Perfil</span>
                         <div className="flex items-center gap-3">
                             <button
                                 className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-sm font-medium focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -247,7 +247,7 @@ export const CreatorProfile = () => {
                                 disabled={isUpdating}
                             >
                                 <Key className="w-4 h-4" />
-                                Change Password
+                                Alterar Senha
                             </button>
                             <button
                                 className="flex items-center gap-1 text-pink-500 hover:text-pink-600 text-sm font-medium focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -257,7 +257,7 @@ export const CreatorProfile = () => {
                                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="inline-block">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828A2 2 0 019 17H7v-2a2 2 0 012-2z" />
                                 </svg>
-                                Edit Profile
+                                Editar Perfil
                             </button>
                         </div>
                     </div>
@@ -299,18 +299,18 @@ export const CreatorProfile = () => {
                         
                         {/* Profile Information Grid */}
                         <div className="w-full">
-                            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Personal Details</h3>
+                            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Detalhes Pessoais</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-sm">
                                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
-                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">State</div>
+                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Estado</div>
                                     <div className="text-gray-900 dark:text-white font-medium">{displayProfile.state}</div>
                                 </div>
                                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
-                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Role</div>
+                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Função</div>
                                     <div className="text-gray-900 dark:text-white font-medium">{displayProfile.role}</div>
                                 </div>
                                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
-                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Spoken Languages</div>
+                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Idiomas Falados</div>
                                     <div className="text-gray-900 dark:text-white font-medium">
                                         {Array.isArray(displayProfile.languages) 
                                             ? displayProfile.languages.join(", ") 
@@ -318,13 +318,13 @@ export const CreatorProfile = () => {
                                     </div>
                                 </div>
                                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
-                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Gender</div>
+                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Gênero</div>
                                     <div className="text-gray-900 dark:text-white font-medium">{displayProfile.gender}</div>
                                 </div>
                                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
                                     <div className="flex items-center gap-2">
                                         <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
-                                        <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">Balance</div>
+                                        <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">Saldo</div>
                                     </div>
                                     <div className="text-gray-900 dark:text-white font-medium text-lg">
                                         ${displayProfile.balance?.toFixed(2) || '0.00'}

@@ -4,12 +4,14 @@ import { combineReducers } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import userReducer from './slices/userSlice';
 import campaignReducer from './slices/campaignSlice';
+import brandProfileReducer from './slices/brandProfileSlice';
 import { rootPersistConfig } from './persistConfig';
 
 const rootReducer = combineReducers({
   auth: authReducer,
   user: userReducer,
   campaign: campaignReducer,
+  brandProfile: brandProfileReducer,
 });
 
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);
