@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import { fetchUserProfile, updateUserProfile } from "../../store/thunks/userThunks";
 import { updateUserPassword } from "../../store/thunks/authThunks";
-import { Crown, Key } from "lucide-react";
+import { Crown, Key, AlertTriangle, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import EditProfile from "./EditProfile";
 import UpdatePasswordModal from "../ui/UpdatePasswordModal";
@@ -25,6 +25,7 @@ const defaultProfile = {
     gender: "Not specified",
     categories: ["General"],
     image: null,
+    balance: 0,
 };
 
 export const CreatorProfile = () => {
@@ -32,6 +33,8 @@ export const CreatorProfile = () => {
     const [editMode, setEditMode] = useState(false);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [isTransitioning, setIsTransitioning] = useState(false);
     
     // Get profile data from Redux store
     const { profile, isLoading, error } = useAppSelector((state) => state.user);
@@ -42,14 +45,20 @@ export const CreatorProfile = () => {
         const fetchProfile = async () => {
             try {
                 await dispatch(fetchUserProfile()).unwrap();
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error fetching profile:', error);
-                toast.error("Erro ao carregar perfil");
+                // Don't show error toast for authentication errors as they're handled by the interceptor
+                if (!error?.message?.includes('401') && !error?.message?.includes('Unauthorized')) {
+                    toast.error("Erro ao carregar perfil");
+                }
             }
         };
         
-        fetchProfile();
-    }, [dispatch]);
+        // Only fetch if user is authenticated
+        if (user?.id) {
+            fetchProfile();
+        }
+    }, [dispatch, user?.id]);
 
     // Merge user data with profile data and fallback to defaults
     const displayProfile = {
@@ -61,34 +70,78 @@ export const CreatorProfile = () => {
         gender: profile?.gender || defaultProfile.gender,
         categories: profile?.categories || defaultProfile.categories,
         image: profile?.avatar || profile?.avatar_url || null,
-        has_premium: profile?.has_premium || false,
+        has_premium: profile?.has_premium || user?.isPremium || false,
+        balance: profile?.balance || user?.balance || defaultProfile.balance,
     };
 
-    const handleSaveProfile = async (updatedProfile: any) => {
+    const handleSaveProfile = useCallback(async (updatedProfile: any) => {
+        if (isUpdating) {
+            console.log('Profile update already in progress, skipping...');
+            return;
+        }
+
+        setIsUpdating(true);
+        
         try {
-            // Map form data to API format
-            const profileData = {
+            console.log('Starting profile update with data:', updatedProfile);
+            
+            // Map form data to API format, matching backend expectations
+            const profileData: any = {
                 name: updatedProfile.name,
                 email: updatedProfile.email,
-                location: updatedProfile.state, // Map state to location
+                location: updatedProfile.state, // Backend expects 'location' for state
                 role: updatedProfile.role,
-                languages: Array.isArray(updatedProfile.languages) 
-                    ? updatedProfile.languages 
-                    : updatedProfile.languages?.split(',').map((l: string) => l.trim()),
                 gender: updatedProfile.gender,
-                categories: updatedProfile.categories,
-                avatar: updatedProfile.image, // File object if uploaded
             };
 
-            await dispatch(updateUserProfile(profileData)).unwrap();
-            toast.success("Profile updated successfully!");
-            setEditMode(false);
-        } catch (error: any) {
-            toast.error(error || "Failed to update profile");
-        }
-    };
+            // Avatar: backend expects 'avatar' (file), not 'avatar_url'
+            if (updatedProfile.image instanceof File) {
+                profileData.avatar = updatedProfile.image;
+            }
 
-    const handleUpdatePassword = async (passwordData: { currentPassword: string; newPassword: string }) => {
+            // Languages: backend expects JSON string
+            if (Array.isArray(updatedProfile.languages)) {
+                profileData.languages = JSON.stringify(updatedProfile.languages);
+            } else if (typeof updatedProfile.languages === 'string') {
+                // If it's a comma-separated string, split and stringify
+                profileData.languages = JSON.stringify(updatedProfile.languages.split(',').map((l: string) => l.trim()));
+            }
+
+            // Categories: backend expects JSON string, but always returns ['General']
+            // You can still send it for future compatibility, but it won't be reflected in the response
+            if (Array.isArray(updatedProfile.categories)) {
+                profileData.categories = JSON.stringify(updatedProfile.categories);
+            } else if (typeof updatedProfile.categories === 'string') {
+                profileData.categories = JSON.stringify(updatedProfile.categories.split(',').map((c: string) => c.trim()));
+            }
+
+            console.log('Sending profile data to backend:', profileData);
+
+            // Update profile
+            const updateResult = await dispatch(updateUserProfile(profileData)).unwrap();
+            console.log('Profile update result:', updateResult);
+
+            // Refetch the latest profile from backend
+            const fetchResult = await dispatch(fetchUserProfile()).unwrap();
+            console.log('Profile fetch result:', fetchResult);
+
+            // Exit edit mode first, then show success message
+            setEditMode(false);
+            
+            // Use requestAnimationFrame to ensure the component has finished re-rendering
+            requestAnimationFrame(() => {
+                toast.success("Profile updated successfully!");
+            });
+            
+        } catch (error: any) {
+            console.error('Profile update failed:', error);
+            toast.error(error?.message || error || "Failed to update profile");
+        } finally {
+            setIsUpdating(false);
+        }
+    }, [dispatch, isUpdating]);
+
+    const handleUpdatePassword = useCallback(async (passwordData: { currentPassword: string; newPassword: string }) => {
         if (!user?.id) {
             toast.error("User not authenticated");
             return;
@@ -102,14 +155,37 @@ export const CreatorProfile = () => {
                 userId: user.id
             };
             await dispatch(updateUserPassword(passwordUpdateData)).unwrap();
-            toast.success("Password updated successfully!");
             setShowPasswordModal(false);
+            
+            // Use requestAnimationFrame to ensure the modal has finished closing
+            requestAnimationFrame(() => {
+                toast.success("Password updated successfully!");
+            });
         } catch (error: any) {
-            toast.error(error || "Failed to update password");
+            console.error('Password update failed:', error);
+            toast.error(error?.message || error || "Failed to update password");
         } finally {
             setIsPasswordLoading(false);
         }
-    };
+    }, [dispatch, user?.id]);
+
+    // Handle edit mode toggle
+    const handleEditModeToggle = useCallback(() => {
+        if (isUpdating) {
+            console.log('Cannot toggle edit mode while updating...');
+            return;
+        }
+        setEditMode(!editMode);
+    }, [editMode, isUpdating]);
+
+    // Handle password modal toggle
+    const handlePasswordModalToggle = useCallback(() => {
+        if (isUpdating) {
+            console.log('Cannot open password modal while updating...');
+            return;
+        }
+        setShowPasswordModal(!showPasswordModal);
+    }, [showPasswordModal, isUpdating]);
 
     if (editMode) {
         return (
@@ -117,14 +193,23 @@ export const CreatorProfile = () => {
                 initialProfile={displayProfile}
                 onCancel={() => setEditMode(false)}
                 onSave={handleSaveProfile}
-                isLoading={isLoading}
+                isLoading={isLoading || isUpdating}
             />
+        );
+    }
+
+    // Don't render if user is not authenticated
+    if (!user?.id) {
+        return (
+            <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] flex items-center justify-center">
+                <div className="text-gray-500 dark:text-gray-400">Please log in to view your profile</div>
+            </div>
         );
     }
 
     if (isLoading) {
         return (
-            <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] p-6 flex items-center justify-center">
+            <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] flex items-center justify-center">
                 <div className="text-gray-500 dark:text-gray-400">Loading profile...</div>
             </div>
         );
@@ -132,7 +217,7 @@ export const CreatorProfile = () => {
 
     if (error) {
         return (
-            <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] p-6 flex items-center justify-center">
+            <div className="min-h-[92vh] bg-gray-50 dark:bg-[#171717] flex items-center justify-center">
                 <div className="text-red-500">Error loading profile: {error}</div>
             </div>
         );
@@ -143,20 +228,43 @@ export const CreatorProfile = () => {
             <div className="w-full">
                 <h1 className="text-2xl font-bold mb-1 text-gray-900 dark:text-white">Minha Conta</h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Gerencie suas informações pessoais</p>
+                
+                {/* Premium Subscription Alert */}
+                {!displayProfile.has_premium && (
+                    <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                        <div className="flex items-center gap-3">
+                            <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                            <div className="flex-1">
+                                <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                    Please Subscribe to Premium
+                                </h3>
+                                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                                    Unlock premium features and enhance your creator experience
+                                </p>
+                            </div>
+                            <button className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm font-medium rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200">
+                                Upgrade Now
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="bg-background rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-6">
-                    <div className="flex justify-between items-start mb-4">
-                        <span className="font-semibold text-base text-gray-900 dark:text-white">Informações do perfil</span>
+                    <div className="flex justify-between items-start mb-6">
+                        <span className="font-semibold text-base text-gray-900 dark:text-white">Profile Information</span>
                         <div className="flex items-center gap-3">
                             <button
-                                className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-sm font-medium focus:outline-none"
-                                onClick={() => setShowPasswordModal(true)}
+                                className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-sm font-medium focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={handlePasswordModalToggle}
+                                disabled={isUpdating}
                             >
                                 <Key className="w-4 h-4" />
                                 Change Password
                             </button>
                             <button
-                                className="flex items-center gap-1 text-pink-500 hover:text-pink-600 text-sm font-medium focus:outline-none"
-                                onClick={() => setEditMode(true)}
+                                className="flex items-center gap-1 text-pink-500 hover:text-pink-600 text-sm font-medium focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={handleEditModeToggle}
+                                disabled={isUpdating}
                             >
                                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="inline-block">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828A2 2 0 019 17H7v-2a2 2 0 012-2z" />
@@ -165,6 +273,7 @@ export const CreatorProfile = () => {
                             </button>
                         </div>
                     </div>
+                    
                     <div className="flex flex-col gap-8 items-start">
                         {/* Avatar and name */}
                         <div className="flex gap-4 items-center min-w-[120px]">
@@ -190,7 +299,7 @@ export const CreatorProfile = () => {
                             <div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-base font-semibold text-gray-900 dark:text-white">{displayProfile.name}</span>
-                                    {user?.isPremium && (
+                                    {displayProfile.has_premium && (
                                         <span className="px-2 py-1 text-xs font-medium bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full">
                                             PRO
                                         </span>
@@ -199,23 +308,40 @@ export const CreatorProfile = () => {
                                 <div className="text-sm text-gray-500 dark:text-gray-300">{displayProfile.email}</div>
                             </div>
                         </div>
-                        {/* Info grid */}
-                        <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-sm mt-2">
-                            <div>
-                                <div className="text-gray-400 dark:text-gray-400">Estado</div>
-                                <div className="text-gray-900 dark:text-white">{displayProfile.state}</div>
-                            </div>
-                            <div>
-                                <div className="text-gray-400 dark:text-gray-400">Role</div>
-                                <div className="text-gray-900 dark:text-white">{displayProfile.role}</div>
-                            </div>
-                            <div>
-                                <div className="text-gray-400 dark:text-gray-400">Línguas faladas</div>
-                                <div className="text-gray-900 dark:text-white">{displayProfile.languages.join(", ")}</div>
-                            </div>
-                            <div>
-                                <div className="text-gray-400 dark:text-gray-400">Gênero</div>
-                                <div className="text-gray-900 dark:text-white">{displayProfile.gender}</div>
+                        
+                        {/* Profile Information Grid */}
+                        <div className="w-full">
+                            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Personal Details</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-sm">
+                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">State</div>
+                                    <div className="text-gray-900 dark:text-white font-medium">{displayProfile.state}</div>
+                                </div>
+                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Role</div>
+                                    <div className="text-gray-900 dark:text-white font-medium">{displayProfile.role}</div>
+                                </div>
+                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Spoken Languages</div>
+                                    <div className="text-gray-900 dark:text-white font-medium">
+                                        {Array.isArray(displayProfile.languages) 
+                                            ? displayProfile.languages.join(", ") 
+                                            : displayProfile.languages}
+                                    </div>
+                                </div>
+                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                                    <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Gender</div>
+                                    <div className="text-gray-900 dark:text-white font-medium">{displayProfile.gender}</div>
+                                </div>
+                                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                                    <div className="flex items-center gap-2">
+                                        <DollarSign className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                        <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">Balance</div>
+                                    </div>
+                                    <div className="text-gray-900 dark:text-white font-medium text-lg">
+                                        ${displayProfile.balance?.toFixed(2) || '0.00'}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

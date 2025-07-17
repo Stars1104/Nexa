@@ -59,7 +59,6 @@ import {
 // Clear from Redux store only
 const handleClearData = () => {
   clearCampaignData();
-  console.log("Campaign data cleared from Redux store");
 };
 
 // Clear from both Redux store and localStorage

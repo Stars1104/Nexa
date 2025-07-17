@@ -17,6 +17,9 @@ AuthAPI.interceptors.request.use(
         const token = getTokenFromStore();
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+            console.log('Adding token to request:', config.url);
+        } else {
+            console.log('No token found for request:', config.url);
         }
         return config;
     },
@@ -30,8 +33,22 @@ AuthAPI.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            // Token might be expired, let the calling code handle it
+            // Token is expired or invalid, clear authentication
             console.warn('Authentication failed - token may be expired');
+            console.log('Response data:', error.response?.data);
+            
+            // Clear localStorage
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            
+            // Clear Redux persist state
+            localStorage.removeItem('persist:auth');
+            
+            // Redirect to login page
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/signup' && 
+                !window.location.pathname.includes('/auth')) {
+                window.location.href = '/auth';
+            }
         } else if (error.response?.status === 403) {
             // Forbidden - user doesn't have permission
             console.warn('Access forbidden - user may not have required permissions');
@@ -49,7 +66,13 @@ AuthAPI.interceptors.response.use(
 // Helper function to get token from Redux store
 function getTokenFromStore(): string | null {
     try {
-        // Get the persisted state from localStorage
+        // First try to get from localStorage directly (as stored by authSlice)
+        const directToken = localStorage.getItem('token');
+        if (directToken) {
+            return directToken;
+        }
+        
+        // Fallback to Redux persist state
         const persistedState = localStorage.getItem('persist:auth');
         if (persistedState) {
             const parsedState = JSON.parse(persistedState);
@@ -116,24 +139,48 @@ export const signin = async (data: any) => {
 
 // Profile Update Function
 export const profileUpdate = async (data: any) => {
-    // Determine if this is FormData (for file uploads) or regular data
-    const isFormData = data instanceof FormData;
-    
-    const config = {
-        headers: {
-            "Content-Type": isFormData ? "multipart/form-data" : "application/json",
-        },
-    };
-    
-    const response = await AuthAPI.put("/api/profile", data, config);
-    return response.data;
+    try {
+        const isFormData = data instanceof FormData;
+        console.log('[API] Profile update request:', isFormData ? '[FormData]' : data);
+        const config = {
+            headers: {
+                "Content-Type": isFormData ? "multipart/form-data" : "application/json",
+            },
+        };
+        const response = await AuthAPI.put("/api/profile", data, config);
+        console.log('[API] Profile update response:', response.data);
+        if (!response.data.success) {
+            throw new Error(response.data.message || 'Failed to update profile');
+        }
+        return response.data;
+    } catch (error: any) {
+        console.error('[API] Profile update error:', {
+            status: error?.response?.status,
+            statusText: error?.response?.statusText,
+            data: error?.response?.data,
+            message: error?.message
+        });
+        throw error;
+    }
 };
 
 // Get Profile Function
 export const getProfile = async () => {
-    const response = await AuthAPI.get("/api/profile");
-    console.log(response.data);
-    return response.data;
+    try {
+        const response = await AuthAPI.get("/api/profile");
+        if (!response.data.success) {
+            throw new Error(response.data.message || 'Failed to fetch profile');
+        }
+        return response.data;
+    } catch (error: any) {
+        console.error('[API] Profile fetch error:', {
+            status: error?.response?.status,
+            statusText: error?.response?.statusText,
+            data: error?.response?.data,
+            message: error?.message
+        });
+        throw error;
+    }
 };
 
 // Get User Function - Comprehensive user data for profile editing

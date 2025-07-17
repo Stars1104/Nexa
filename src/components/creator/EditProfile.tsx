@@ -9,6 +9,36 @@ import {
 } from "../ui/select";
 import { UploadIcon, XIcon } from "lucide-react";
 
+const BRAZILIAN_STATES = [
+  "Acre",
+  "Alagoas",
+  "Amapá",
+  "Amazonas",
+  "Bahia",
+  "Ceará",
+  "Distrito Federal",
+  "Espírito Santo",
+  "Goiás",
+  "Maranhão",
+  "Mato Grosso",
+  "Mato Grosso do Sul",
+  "Minas Gerais",
+  "Pará",
+  "Paraíba",
+  "Paraná",
+  "Pernambuco",
+  "Piauí",
+  "Rio de Janeiro",
+  "Rio Grande do Norte",
+  "Rio Grande do Sul",
+  "Rondônia",
+  "Roraima",
+  "Santa Catarina",
+  "São Paulo",
+  "Sergipe",
+  "Tocantins"
+];
+
 const getInitials = (name: string) => {
     return name
         .split(" ")
@@ -39,7 +69,6 @@ export const EditProfile: React.FC<{
 }> = ({ initialProfile = defaultProfile, onCancel, onSave, isLoading = false }) => {
     const [profile, setProfile] = useState({ ...initialProfile });
     const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [categoryInput, setCategoryInput] = useState("");
     const [error, setError] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,6 +114,7 @@ export const EditProfile: React.FC<{
 
     const handleSave = (e: React.FormEvent) => {
         e.preventDefault();
+        console.log("Profile", profile);
         onSave(profile);
     };
 
@@ -174,17 +204,22 @@ export const EditProfile: React.FC<{
                     </div>
                     <div className="flex flex-col">
                         <label className="font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
-                        <Input
-                            id="state"
-                            name="state"
-                            type="text"
-                            placeholder="Enter your state"
+                        <Select
                             value={profile.state}
-                            onChange={handleChange}
+                            onValueChange={val => setProfile(p => ({ ...p, state: val }))}
                             disabled={isLoading}
-                            required
-                            autoComplete="state"
-                        />
+                        >
+                            <SelectTrigger className="bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 rounded-md px-4 py-2 text-gray-900 dark:text-white outline-none placeholder-gray-400 dark:placeholder-gray-500 text-base">
+                                <SelectValue placeholder="Select your state" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {BRAZILIAN_STATES.map((state) => (
+                                    <SelectItem key={state} value={state}>
+                                        {state}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="flex flex-col">
                         <label className="font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>

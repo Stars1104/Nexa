@@ -80,12 +80,6 @@ const campaignWithoutAttachments = {
   description: "Uma campanha sem arquivos anexados"
 };
 
-console.log("Test scenarios for file attachment functionality:");
-console.log("1. Single attachment:", campaignWithSingleAttachment);
-console.log("2. Few attachments (≤3):", campaignWithFewAttachments);
-console.log("3. Many attachments (>3):", campaignWithManyAttachments);
-console.log("4. No attachments:", campaignWithoutAttachments);
-
 // Expected behavior:
 // - Single attachment: Shows as a simple card with file icon, name, and action buttons
 // - Few attachments (≤3): Shows as a list of cards, each with file details

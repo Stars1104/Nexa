@@ -16,8 +16,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, token, user } = useAppSelector((state) => state.auth);
   const location = useLocation();
 
-  // If not authenticated or no token, redirect to auth page
-  if (!isAuthenticated || !token) {
+  // If not authenticated, no token, or no user, redirect to auth page
+  if (!isAuthenticated || !token || !user?.id) {
+    // Check if there's a token in localStorage that might be expired
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      // Clear expired token
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('persist:auth');
+    }
     // Store the current location so we can redirect back after login
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }

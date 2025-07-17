@@ -170,7 +170,6 @@ import ChatRoomCreator from "../components/ChatRoomCreator";
 <ChatRoomCreator
   application={application}
   onChatCreated={(roomId) => {
-    console.log("Chat room created:", roomId);
     // Navigate to chat or show notification
   }}
 />;
