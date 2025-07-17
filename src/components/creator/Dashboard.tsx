@@ -106,8 +106,6 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
     const { creatorApplications } = useAppSelector((state) => state.campaign);
     const { user } = useAppSelector((state) => state.auth);
 
-    console.log(approvedCampaigns);
-    
     // Filter state
     const [filters, setFilters] = useState<FilterState>({
         category: "all",

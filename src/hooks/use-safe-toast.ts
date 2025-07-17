@@ -42,7 +42,6 @@ export const useSafeToast = (): UseSafeToastReturn => {
         case 'success':
         case 'info':
         default:
-          console.log(message);
           break;
       }
     }

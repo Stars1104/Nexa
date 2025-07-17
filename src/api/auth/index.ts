@@ -17,10 +17,13 @@ AuthAPI.interceptors.request.use(
         const token = getTokenFromStore();
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
-            console.log('Adding token to request:', config.url);
-        } else {
-            console.log('No token found for request:', config.url);
         }
+        
+        // Handle FormData properly - don't set Content-Type for FormData
+        if (config.data instanceof FormData) {
+            delete config.headers['Content-Type'];
+        }
+        
         return config;
     },
     (error) => {
@@ -34,9 +37,6 @@ AuthAPI.interceptors.response.use(
     (error) => {
         if (error.response?.status === 401) {
             // Token is expired or invalid, clear authentication
-            console.warn('Authentication failed - token may be expired');
-            console.log('Response data:', error.response?.data);
-            
             // Clear localStorage
             localStorage.removeItem('token');
             localStorage.removeItem('user');
@@ -96,7 +96,6 @@ export const signup = async (data: any) => {
 export const healthCheck = async () => {
     try {
         const response = await AuthAPI.get("/api/health");
-        console.log('Health check response:', response.data);
         return response.data;
     } catch (error: any) {
         console.error('Health check failed:', {
@@ -113,12 +112,8 @@ export const healthCheck = async () => {
 
 // Signin Function
 export const signin = async (data: any) => {
-    console.log('Login payload:', data);
-    console.log('Backend URL:', BackendURL);
-    
     try {
         const response = await AuthAPI.post("/api/login", data);
-        console.log('Login response:', response.data);
         return response.data;
     } catch (error: any) {
         console.error('Login error details:', {
@@ -141,14 +136,19 @@ export const signin = async (data: any) => {
 export const profileUpdate = async (data: any) => {
     try {
         const isFormData = data instanceof FormData;
-        console.log('[API] Profile update request:', isFormData ? '[FormData]' : data);
+        
         const config = {
             headers: {
                 "Content-Type": isFormData ? "multipart/form-data" : "application/json",
             },
         };
+        
+        // For FormData, let the browser set the Content-Type with boundary
+        if (isFormData) {
+            delete config.headers["Content-Type"];
+        }
+        
         const response = await AuthAPI.put("/api/profile", data, config);
-        console.log('[API] Profile update response:', response.data);
         if (!response.data.success) {
             throw new Error(response.data.message || 'Failed to update profile');
         }
@@ -158,7 +158,8 @@ export const profileUpdate = async (data: any) => {
             status: error?.response?.status,
             statusText: error?.response?.statusText,
             data: error?.response?.data,
-            message: error?.message
+            message: error?.message,
+            validationErrors: error?.response?.data?.errors
         });
         throw error;
     }
@@ -188,9 +189,6 @@ export const getUser = async (userId?: string) => {
     try {
         const endpoint = userId ? `/api/users/${userId}` : "/api/user";
         const response = await AuthAPI.get(endpoint);
-        
-        console.log('Get user response:', response.data);
-        
         // Ensure consistent response format
         if (response.data.success === false) {
             throw new Error(response.data.message || 'Failed to fetch user data');
@@ -225,4 +223,6 @@ export const updatePassword = async (user_id: string, newPassword: string, curre
 // Logout Function
 export const logout = async () => {
     const response = await AuthAPI.post("/api/logout");
-}; 
+};
+
+ 

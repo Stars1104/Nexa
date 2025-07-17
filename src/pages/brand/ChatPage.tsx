@@ -55,8 +55,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isMountedRef = useRef(true);
 
-    console.log("TYPE", typingUsers)
-
     // Socket.IO hook
     const {
         socket,
@@ -106,7 +104,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
 
     // Clear typing users when room changes
     useEffect(() => {
-        console.log('Room changed - clearing typing users');
         setTypingUsers(new Set());
     }, [selectedRoom?.room_id]);
 
@@ -201,26 +198,16 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
         const handleUserTyping = (data: any) => {
             if (!isMountedRef.current) return;
             
-            console.log('Received typing event:', data);
-            console.log('Current selectedRoom:', selectedRoom?.room_id);
-            console.log('Event roomId:', data.roomId);
-            
             if (data.roomId === selectedRoom?.room_id) {
                 setTypingUsers(prev => {
-                    console.log('Previous typing users:', Array.from(prev));
                     const newSet = new Set(prev);
                     if (data.isTyping) {
-                        console.log('Adding typing user:', data.userName);
                         newSet.add(data.userName);
                     } else {
-                        console.log('Removing typing user:', data.userName);
                         newSet.delete(data.userName);
                     }
-                    console.log('Updated typing users:', Array.from(newSet));
                     return newSet;
                 });
-            } else {
-                console.log('Room mismatch - ignoring typing event');
             }
         };
 
@@ -258,7 +245,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
     useEffect(() => {
         if (typingUsers.size > 0) {
             const timeoutId = setTimeout(() => {
-                console.log('Auto-clearing typing users after 3 seconds');
                 setTypingUsers(new Set());
             }, 3000); // Clear after 3 seconds
 
@@ -420,7 +406,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
             
             // Start typing indicator immediately when user types
             if (!isCurrentUserTyping) {
-                console.log('Starting typing indicator');
                 setIsCurrentUserTyping(true);
                 startTyping(selectedRoom.room_id);
             }
@@ -428,7 +413,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
             // Set timeout to stop typing indicator 1 second after user stops typing
             typingTimeoutRef.current = setTimeout(() => {
                 if (isMountedRef.current) {
-                    console.log('Timeout triggered - stopping typing indicator');
                     stopTyping(selectedRoom.room_id);
                     setIsCurrentUserTyping(false);
                 }
@@ -447,7 +431,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
         
         typingTimeoutRef.current = setTimeout(() => {
             if (isMountedRef.current && isCurrentUserTyping) {
-                console.log('KeyUp timeout - stopping typing indicator');
                 stopTyping(selectedRoom.room_id);
                 setIsCurrentUserTyping(false);
             }
@@ -465,7 +448,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
         }
         
         if (isCurrentUserTyping) {
-            console.log('Input blur - stopping typing indicator');
             setIsCurrentUserTyping(false);
             stopTyping(selectedRoom.room_id);
         }
@@ -550,8 +532,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
             if (message.file_url && !isDownloading) {
                 setIsDownloading(true);
                 try {
-                    console.log('Starting download for:', message.file_name, 'URL:', message.file_url);
-                    
                     // Always try fetch first for better control
                     const response = await fetch(message.file_url, {
                         method: 'GET',
@@ -564,7 +544,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                     }
                     
                     const blob = await response.blob();
-                    console.log('File blob created, size:', blob.size);
                     
                     // Create a blob URL
                     const blobUrl = window.URL.createObjectURL(blob);
@@ -583,14 +562,12 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                     // Clean up the blob URL
                     window.URL.revokeObjectURL(blobUrl);
                     
-                    console.log('Download completed successfully');
                 } catch (error) {
                     console.error('Error downloading file:', error);
                     
                     // Try fallback method for images
                     if (message.message_type === 'image') {
                         try {
-                            console.log('Trying canvas fallback for image');
                             // For images, try to create a canvas and download
                             const img = new Image();
                             img.crossOrigin = 'anonymous';
@@ -613,7 +590,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                                         link.click();
                                         document.body.removeChild(link);
                                         window.URL.revokeObjectURL(url);
-                                        console.log('Canvas fallback download completed');
                                     }
                                 }, 'image/jpeg', 0.9);
                             };
@@ -631,7 +607,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                     } else {
                         // For other files, try direct download
                         try {
-                            console.log('Trying direct download fallback');
                             const link = document.createElement('a');
                             link.href = message.file_url;
                             link.download = message.file_name || 'download';
@@ -640,7 +615,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                             document.body.appendChild(link);
                             link.click();
                             document.body.removeChild(link);
-                            console.log('Direct download fallback completed');
                         } catch (fallbackError) {
                             console.error('Fallback download failed:', fallbackError);
                             alert('Unable to download file. Please try opening it in a new tab and saving manually.');
@@ -863,7 +837,7 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                                         )}
                                     >
                                         <Avatar className="w-12 h-12">
-                                            <AvatarImage src={room.other_user.avatar} />
+                                            <AvatarImage src={`http://localhost:8000${room.other_user.avatar}`} />
                                             <AvatarFallback className="bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400">
                                                 {room.other_user.name.charAt(0).toUpperCase()}
                                             </AvatarFallback>
@@ -909,7 +883,7 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                             <div className="flex items-center justify-between p-4 border-b bg-background">
                                 <div className="flex items-center gap-3">
                                     <Avatar className="w-10 h-10">
-                                        <AvatarImage src={selectedRoom.other_user.avatar} />
+                                        <AvatarImage src={`http://localhost:8000${selectedRoom.other_user.avatar}`} />
                                         <AvatarFallback className="bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400">
                                             {selectedRoom.other_user.name.charAt(0).toUpperCase()}
                                         </AvatarFallback>
@@ -951,7 +925,7 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                                         >
                                             {!message.is_sender && (
                                                 <Avatar className="w-8 h-8">
-                                                    <AvatarImage src={selectedRoom.other_user.avatar} />
+                                                    <AvatarImage src={`http://localhost:8000${selectedRoom.other_user.avatar}`} />
                                                     <AvatarFallback className="bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400 text-xs">
                                                         {selectedRoom.other_user.name.charAt(0).toUpperCase()}
                                                     </AvatarFallback>

@@ -107,12 +107,6 @@ export default function CreateCampaign() {
       }
     } catch (err) {
       console.error('Toast error:', err);
-      // Fallback to console or alert if toast fails
-      if (type === 'error') {
-        console.error(message);
-      } else {
-        console.log(message);
-      }
     }
   }, []);
 
@@ -240,8 +234,6 @@ export default function CreateCampaign() {
         logo: file,
         attachments: attachments,
       };
-
-      console.log("Campaign data:", campaignData);
 
       const result = await dispatch(createCampaign(campaignData));
       
@@ -379,7 +371,6 @@ export default function CreateCampaign() {
                   mode="single"
                   selected={deadline}
                   onSelect={(date) => {
-                    console.log("Date selected:", date);
                     setDeadline(date);
                   }}
                   fromDate={new Date()}

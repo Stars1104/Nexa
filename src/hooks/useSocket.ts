@@ -59,7 +59,6 @@ export const useSocket = (): UseSocketReturn => {
         socket.on('connect', () => {
             if (!isMountedRef.current) return;
             
-            console.log('Connected to Socket.IO server');
             setIsConnected(true);
             setConnectionError(null);
             reconnectAttemptsRef.current = 0;
@@ -78,7 +77,6 @@ export const useSocket = (): UseSocketReturn => {
         socket.on('disconnect', (reason) => {
             if (!isMountedRef.current) return;
             
-            console.log('Disconnected from Socket.IO server:', reason);
             setIsConnected(false);
             
             if (reason === 'io server disconnect') {
@@ -105,7 +103,6 @@ export const useSocket = (): UseSocketReturn => {
                 
                 reconnectTimeoutRef.current = setTimeout(() => {
                     if (isMountedRef.current) {
-                        console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
                         try {
                             socket.connect();
                         } catch (error) {
@@ -119,7 +116,6 @@ export const useSocket = (): UseSocketReturn => {
         socket.on('reconnect', (attemptNumber) => {
             if (!isMountedRef.current) return;
             
-            console.log(`Reconnected after ${attemptNumber} attempts`);
             setIsConnected(true);
             setConnectionError(null);
             reconnectAttemptsRef.current = 0;
@@ -204,7 +200,6 @@ export const useSocket = (): UseSocketReturn => {
         if (socketRef.current && isConnected) {
             try {
                 socketRef.current.emit('join_room', roomId);
-                console.log(`Joined room: ${roomId}`);
             } catch (error) {
                 console.warn('Error joining room:', error);
             }
@@ -218,7 +213,6 @@ export const useSocket = (): UseSocketReturn => {
         if (socketRef.current && isConnected) {
             try {
                 socketRef.current.emit('leave_room', roomId);
-                console.log(`Left room: ${roomId}`);
             } catch (error) {
                 console.warn('Error leaving room:', error);
             }
@@ -277,9 +271,7 @@ export const useSocket = (): UseSocketReturn => {
                         } : undefined,
                     };
                     
-                    console.log('Emitting socket message:', socketData);
                     socketRef.current.emit('send_message', socketData);
-                    console.log('Socket message emitted successfully');
                 } catch (error) {
                     console.warn('Error emitting message:', error);
                 }
@@ -298,17 +290,13 @@ export const useSocket = (): UseSocketReturn => {
     const startTyping = useCallback((roomId: string) => {
         if (!isMountedRef.current) return;
         
-        console.log('startTyping called for room:', roomId);
-        
         if (socketRef.current && isConnected && user) {
             try {
-                console.log('Emitting typing_start event');
                 socketRef.current.emit('typing_start', {
                     roomId,
                     userId: user.id,
                     userName: user.name,
                 });
-                console.log('typing_start event emitted successfully');
             } catch (error) {
                 console.warn('Error starting typing indicator:', error);
             }
@@ -321,17 +309,13 @@ export const useSocket = (): UseSocketReturn => {
     const stopTyping = useCallback((roomId: string) => {
         if (!isMountedRef.current) return;
         
-        console.log('stopTyping called for room:', roomId);
-        
         if (socketRef.current && isConnected && user) {
             try {
-                console.log('Emitting typing_stop event');
                 socketRef.current.emit('typing_stop', {
                     roomId,
                     userId: user.id,
                     userName: user.name,
                 });
-                console.log('typing_stop event emitted successfully');
             } catch (error) {
                 console.warn('Error stopping typing indicator:', error);
             }

@@ -41,7 +41,6 @@ export default function Chat() {
     const [searchQuery, setSearchQuery] = useState("");
     const [openDropdowns, setOpenDropdowns] = useState<Set<number>>(new Set());
     
-    console.log("TYPE", typingUsers); // Debug log to track typing users
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,7 +98,6 @@ export default function Chat() {
     // Auto-join room when selectedRoom changes
     useEffect(() => {
         if (selectedRoom && isConnected) {
-            console.log('Auto-joining room:', selectedRoom.room_id);
             joinRoom(selectedRoom.room_id);
         }
     }, [selectedRoom, isConnected, joinRoom]);
@@ -128,14 +126,11 @@ export default function Chat() {
 
         // Listen for new messages from other users
         const handleNewMessage = (data: any) => {
-            console.log('Received new message:', data);
             if (!isMountedRef.current) return;
             
             if (data.roomId === selectedRoom?.room_id) {
-                console.log('Message is for current room:', selectedRoom.room_id);
                 // Only add message if it's from another user (not the current user)
                 if (data.senderId !== user?.id) {
-                    console.log('Adding message from other user:', data.senderName);
                     const messageId = data.messageId || Math.floor(Date.now() / 1000);
                     const newMessage: Message = {
                         id: messageId,
@@ -160,11 +155,8 @@ export default function Chat() {
                     markMessagesAsRead(data.roomId, [messageId]).catch(error => {
                         console.warn('Error marking message as read:', error);
                     });
-                } else {
-                    console.log('Ignoring message from self');
                 }
             } else {
-                console.log('Message is not for current room. Expected:', selectedRoom?.room_id, 'Got:', data.roomId);
             }
             
             // Update conversation list
@@ -175,26 +167,16 @@ export default function Chat() {
         const handleUserTyping = (data: any) => {
             if (!isMountedRef.current) return;
             
-            console.log('Received typing event:', data);
-            console.log('Current selectedRoom:', selectedRoom?.room_id);
-            console.log('Event roomId:', data.roomId);
-            
             if (data.roomId === selectedRoom?.room_id) {
                 setTypingUsers(prev => {
-                    console.log('Previous typing users:', Array.from(prev));
                     const newSet = new Set(prev);
                     if (data.isTyping) {
-                        console.log('Adding typing user:', data.userName);
                         newSet.add(data.userName);
                     } else {
-                        console.log('Removing typing user:', data.userName);
                         newSet.delete(data.userName);
                     }
-                    console.log('Updated typing users:', Array.from(newSet));
                     return newSet;
                 });
-            } else {
-                console.log('Room mismatch - ignoring typing event');
             }
         };
 
@@ -251,7 +233,6 @@ export default function Chat() {
     useEffect(() => {
         if (typingUsers.size > 0) {
             const timeoutId = setTimeout(() => {
-                console.log('Auto-clearing typing users after 3 seconds');
                 setTypingUsers(new Set());
             }, 3000); // Clear after 3 seconds
 
@@ -263,7 +244,6 @@ export default function Chat() {
 
     // Clear typing users when room changes
     useEffect(() => {
-        console.log('Room changed - clearing typing users');
         setTypingUsers(new Set());
     }, [selectedRoom?.room_id]);
 
@@ -272,7 +252,6 @@ export default function Chat() {
         if (!isMountedRef.current) return;
         
         try {
-            console.log('Loading chat rooms...');
             
             const roomsData = await chatService.getChatRooms();
             if (isMountedRef.current) {
@@ -280,7 +259,6 @@ export default function Chat() {
                 
                 // Auto-select first room if none selected and rooms exist
                 if (!selectedRoom && roomsData.length > 0) {
-                    console.log('Auto-selecting first room:', roomsData[0].room_id);
                     handleConversationSelect(roomsData[0]);
                 }
             }
@@ -441,7 +419,6 @@ export default function Chat() {
             
             // Start typing indicator immediately when user types
             if (!isCurrentUserTyping) {
-                console.log('Starting typing indicator');
                 setIsCurrentUserTyping(true);
                 startTyping(selectedRoom.room_id);
             }
@@ -449,7 +426,6 @@ export default function Chat() {
             // Set timeout to stop typing indicator 1 second after user stops typing
             typingTimeoutRef.current = setTimeout(() => {
                 if (isMountedRef.current) {
-                    console.log('Timeout triggered - stopping typing indicator');
                     stopTyping(selectedRoom.room_id);
                     setIsCurrentUserTyping(false);
                 }
@@ -467,8 +443,7 @@ export default function Chat() {
         }
         
         typingTimeoutRef.current = setTimeout(() => {
-            if (isMountedRef.current && isCurrentUserTyping) {
-                console.log('KeyUp timeout - stopping typing indicator');
+            if (isMountedRef.current && isCurrentUserTyping) {  
                 stopTyping(selectedRoom.room_id);
                 setIsCurrentUserTyping(false);
             }
@@ -486,7 +461,6 @@ export default function Chat() {
         }
         
         if (isCurrentUserTyping) {
-            console.log('Input blur - stopping typing indicator');
             setIsCurrentUserTyping(false);
             stopTyping(selectedRoom.room_id);
         }
@@ -597,7 +571,6 @@ export default function Chat() {
             if (message.file_url && !isDownloading) {
                 setIsDownloading(true);
                 try {
-                    console.log('Starting download for:', message.file_name, 'URL:', message.file_url);
                     
                     // Always try fetch first for better control
                     const response = await fetch(message.file_url, {
@@ -611,7 +584,6 @@ export default function Chat() {
                     }
                     
                     const blob = await response.blob();
-                    console.log('File blob created, size:', blob.size);
                     
                     // Create a blob URL
                     const blobUrl = window.URL.createObjectURL(blob);
@@ -630,14 +602,12 @@ export default function Chat() {
                     // Clean up the blob URL
                     window.URL.revokeObjectURL(blobUrl);
                     
-                    console.log('Download completed successfully');
                 } catch (error) {
                     console.error('Error downloading file:', error);
                     
                     // Try fallback method for images
                     if (message.message_type === 'image') {
-                        try {
-                            console.log('Trying canvas fallback for image');
+                        try {   
                             // For images, try to create a canvas and download
                             const img = new Image();
                             img.crossOrigin = 'anonymous';
@@ -660,7 +630,6 @@ export default function Chat() {
                                         link.click();
                                         document.body.removeChild(link);
                                         window.URL.revokeObjectURL(url);
-                                        console.log('Canvas fallback download completed');
                                     }
                                 }, 'image/jpeg', 0.9);
                             };
@@ -678,7 +647,6 @@ export default function Chat() {
                     } else {
                         // For other files, try direct download
                         try {
-                            console.log('Trying direct download fallback');
                             const link = document.createElement('a');
                             link.href = message.file_url;
                             link.download = message.file_name || 'download';
@@ -687,7 +655,6 @@ export default function Chat() {
                             document.body.appendChild(link);
                             link.click();
                             document.body.removeChild(link);
-                            console.log('Direct download fallback completed');
                         } catch (fallbackError) {
                             console.error('Fallback download failed:', fallbackError);
                             alert('Unable to download file. Please try opening it in a new tab and saving manually.');

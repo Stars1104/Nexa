@@ -8,15 +8,10 @@ export const useAuthRehydration = () => {
 
   useEffect(() => {
     const initializeAuth = () => {
-      console.log('Initializing auth rehydration...');
-      
       // Check if user is already authenticated
       if (!isAuthenticated) {
-        console.log('Checking for existing authentication...');
         dispatch(checkAuthStatus());
       }
-      
-      console.log('Auth rehydration complete');
     };
     
     initializeAuth();

@@ -3,7 +3,7 @@ import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import { fetchUserProfile, updateUserProfile } from "../../store/thunks/userThunks";
 import { updateUserPassword } from "../../store/thunks/authThunks";
 import { Crown, Key, AlertTriangle, DollarSign } from "lucide-react";
-import { toast } from "sonner";
+import { useSafeToast } from "../../hooks/useSafeToast";
 import EditProfile from "./EditProfile";
 import UpdatePasswordModal from "../ui/UpdatePasswordModal";
 
@@ -30,6 +30,7 @@ const defaultProfile = {
 
 export const CreatorProfile = () => {
     const dispatch = useAppDispatch();
+    const safeToast = useSafeToast();
     const [editMode, setEditMode] = useState(false);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [isPasswordLoading, setIsPasswordLoading] = useState(false);
@@ -49,7 +50,7 @@ export const CreatorProfile = () => {
                 console.error('Error fetching profile:', error);
                 // Don't show error toast for authentication errors as they're handled by the interceptor
                 if (!error?.message?.includes('401') && !error?.message?.includes('Unauthorized')) {
-                    toast.error("Erro ao carregar perfil");
+                    safeToast.error("Erro ao carregar perfil");
                 }
             }
         };
@@ -75,6 +76,9 @@ export const CreatorProfile = () => {
     };
 
     const handleSaveProfile = useCallback(async (updatedProfile: any) => {
+
+        console.log("Updated profile", updatedProfile);
+
         if (isUpdating) {
             console.log('Profile update already in progress, skipping...');
             return;
@@ -107,35 +111,21 @@ export const CreatorProfile = () => {
                 profileData.languages = JSON.stringify(updatedProfile.languages.split(',').map((l: string) => l.trim()));
             }
 
-            // Categories: backend expects JSON string, but always returns ['General']
-            // You can still send it for future compatibility, but it won't be reflected in the response
-            if (Array.isArray(updatedProfile.categories)) {
-                profileData.categories = JSON.stringify(updatedProfile.categories);
-            } else if (typeof updatedProfile.categories === 'string') {
-                profileData.categories = JSON.stringify(updatedProfile.categories.split(',').map((c: string) => c.trim()));
-            }
-
-            console.log('Sending profile data to backend:', profileData);
-
             // Update profile
             const updateResult = await dispatch(updateUserProfile(profileData)).unwrap();
-            console.log('Profile update result:', updateResult);
 
             // Refetch the latest profile from backend
             const fetchResult = await dispatch(fetchUserProfile()).unwrap();
-            console.log('Profile fetch result:', fetchResult);
 
             // Exit edit mode first, then show success message
             setEditMode(false);
             
-            // Use requestAnimationFrame to ensure the component has finished re-rendering
-            requestAnimationFrame(() => {
-                toast.success("Profile updated successfully!");
-            });
+            // Use safe toast with longer delay to ensure all React updates are complete
+            safeToast.success("Profile updated successfully!", 300);
             
         } catch (error: any) {
             console.error('Profile update failed:', error);
-            toast.error(error?.message || error || "Failed to update profile");
+            safeToast.error(error?.message || error || "Failed to update profile");
         } finally {
             setIsUpdating(false);
         }
@@ -143,7 +133,7 @@ export const CreatorProfile = () => {
 
     const handleUpdatePassword = useCallback(async (passwordData: { currentPassword: string; newPassword: string }) => {
         if (!user?.id) {
-            toast.error("User not authenticated");
+            safeToast.error("User not authenticated");
             return;
         }
 
@@ -157,13 +147,11 @@ export const CreatorProfile = () => {
             await dispatch(updateUserPassword(passwordUpdateData)).unwrap();
             setShowPasswordModal(false);
             
-            // Use requestAnimationFrame to ensure the modal has finished closing
-            requestAnimationFrame(() => {
-                toast.success("Password updated successfully!");
-            });
+            // Use safe toast with longer delay to ensure the modal has finished closing
+            safeToast.success("Password updated successfully!", 300);
         } catch (error: any) {
             console.error('Password update failed:', error);
-            toast.error(error?.message || error || "Failed to update password");
+            safeToast.error(error?.message || error || "Failed to update password");
         } finally {
             setIsPasswordLoading(false);
         }
@@ -281,7 +269,7 @@ export const CreatorProfile = () => {
                                 <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-400 flex items-center justify-center text-2xl font-bold text-purple-600 dark:text-white mb-2">
                                     {displayProfile.image ? (
                                         <img 
-                                            src={displayProfile.image} 
+                                            src={`http://localhost:8000${displayProfile.image}`} 
                                             alt="Profile" 
                                             className="w-16 h-16 rounded-full object-cover"
                                         />

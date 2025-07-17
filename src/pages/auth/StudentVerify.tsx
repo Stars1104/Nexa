@@ -27,7 +27,6 @@ export default function StudentVerify() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(JSON.stringify(form, null, 2));
     // After student verification, redirect to creator dashboard
     navigateToRoleDashboard('creator');
     // Handle form submission logic here

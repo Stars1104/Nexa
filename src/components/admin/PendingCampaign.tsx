@@ -26,8 +26,6 @@ export default function PendingCampaign() {
     // Ensure pendingCampaigns is always an array
     const campaignsToDisplay = Array.isArray(pendingCampaigns) ? pendingCampaigns : [];
 
-    console.log(campaignsToDisplay);
-
     // Check if user has admin role before making API calls
     useEffect(() => {
         if (user && user.role !== 'admin') {
@@ -150,7 +148,6 @@ export default function PendingCampaign() {
             return;
         }
 
-        console.log('Refreshing pending campaigns...');
         const refreshCampaigns = async () => {
             try {
                 await dispatch(fetchPendingCampaigns()).unwrap();

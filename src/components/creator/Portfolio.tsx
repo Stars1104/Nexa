@@ -91,13 +91,11 @@ export default function Portfolio() {
 
     const handleSaveProfile = () => {
         // Here you would typically save the profile data to your backend
-        console.log("Saving profile:", { profileTitle, bio });
         setIsEditDialogOpen(false);
     };
 
     const handleSavePortfolio = () => {
         // Here you would typically save the portfolio data to your backend
-        console.log("Saving portfolio:", { media });
         setIsPortfolioEditDialogOpen(false);
     };
 

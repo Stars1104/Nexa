@@ -3,7 +3,6 @@ import {
   fetchProfileStart, 
   fetchProfileSuccess, 
   fetchProfileFailure, 
-  updateProfile,
   updateProfileStart,
   updateProfileSuccess,
   updateProfileFailure 
@@ -65,32 +64,36 @@ export const updateUserProfile = createAsyncThunk(
     try {
       dispatch(updateProfileStart());
       
-      // If there's an image file, we need to create FormData for file upload
-      let dataToSend;
-      if (profileData.avatar && profileData.avatar instanceof File) {
-        const formData = new FormData();
-        
-        // Add all profile fields to FormData
-        Object.keys(profileData).forEach(key => {
-          if (key === 'avatar') {
-            formData.append('avatar', profileData.avatar);
-          } else if (key === 'languages' && Array.isArray(profileData[key])) {
-            formData.append('languages', JSON.stringify(profileData[key]));
-          } else if (key === 'categories' && Array.isArray(profileData[key])) {
-            formData.append('categories', JSON.stringify(profileData[key]));
-          } else if (profileData[key] !== undefined && profileData[key] !== null) {
-            formData.append(key, profileData[key]);
-          }
-        });
-        
-        dataToSend = formData;
-      } else {
-        // Regular JSON data
-        const { avatar, ...otherData } = profileData;
-        dataToSend = otherData;
-      }
+            // Always create FormData to ensure consistent data handling
+      const formData = new FormData();
       
-      const response = await profileUpdate(dataToSend);
+      // Add all profile fields to FormData, explicitly excluding avatar if not a file
+      Object.keys(profileData).forEach(key => {
+          // Skip avatar field entirely if it's not a File
+          if (key === 'avatar') {
+            if (profileData.avatar instanceof File) {
+              formData.append('avatar', profileData.avatar);
+            } else {
+            }
+            return; // Skip to next iteration
+          }
+        
+        // Handle other fields
+        if (key === 'languages' && Array.isArray(profileData[key])) {
+          console.log("Adding languages array to FormData");
+          formData.append('languages', JSON.stringify(profileData[key]));
+        } else if (key === 'categories' && Array.isArray(profileData[key])) {
+          console.log("Adding categories array to FormData");
+          formData.append('categories', JSON.stringify(profileData[key]));
+        } else if (profileData[key] !== undefined && profileData[key] !== null && !(Array.isArray(profileData[key]) && profileData[key].length === 0)) {
+          console.log(`Adding ${key} to FormData:`, profileData[key]);
+          formData.append(key, profileData[key]);
+        } else {
+          console.log(`Skipping ${key}:`, profileData[key]);
+        }
+      });
+      
+      const response = await profileUpdate(formData);
       
       if (!response.success) {
         throw new Error(response.message || 'Failed to update profile');
@@ -100,6 +103,14 @@ export const updateUserProfile = createAsyncThunk(
       return response.profile;
     } catch (error: unknown) {
       const apiError = handleApiError(error);
+      
+      // Log detailed error information
+      console.error('Profile update error details:', {
+        error,
+        apiError,
+        response: (error as any)?.response?.data
+      });
+      
       dispatch(updateProfileFailure(apiError.message));
       return rejectWithValue(apiError.message);
     }

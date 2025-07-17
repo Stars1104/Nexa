@@ -114,7 +114,6 @@ export const EditProfile: React.FC<{
 
     const handleSave = (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Profile", profile);
         onSave(profile);
     };
 

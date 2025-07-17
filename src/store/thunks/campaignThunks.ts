@@ -94,7 +94,6 @@ export const createCampaign = createAsyncThunk<
     formData.append('deadline', campaignData.deadline.toISOString());
     
     // Handle states - send as comma-separated string
-    console.log(campaignData.states);
     formData.append('states', campaignData.states.join(','));
     formData.append('locations', campaignData.states.join(',')); // Also send as locations in case backend expects it
     
@@ -114,12 +113,6 @@ export const createCampaign = createAsyncThunk<
     if (campaignData.attachments && campaignData.attachments.length > 0) {
       // Use the first attachment as attach_file
       formData.append('attach_file', campaignData.attachments[0]);
-    }
-    
-    // Log FormData contents for debugging
-    console.log('FormData contents:');
-    for (const [key, value] of formData.entries()) {
-      console.log(`${key}:`, value);
     }
     
     const response = await CreateNewCampaign(formData, token);
@@ -172,7 +165,6 @@ export const fetchPendingCampaigns = createAsyncThunk<
     }
 
     const response = await GetPendingCampaigns(token);
-    console.log('Pending campaigns:', response.data);
     return (response.data);
   } catch (error: unknown) {
     const apiError = handleApiError(error);
