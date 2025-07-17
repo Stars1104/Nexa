@@ -136,6 +136,30 @@ export const getProfile = async () => {
     return response.data;
 };
 
+// Get User Function - Comprehensive user data for profile editing
+export const getUser = async (userId?: string) => {
+    try {
+        const endpoint = userId ? `/api/users/${userId}` : "/api/user";
+        const response = await AuthAPI.get(endpoint);
+        
+        console.log('Get user response:', response.data);
+        
+        // Ensure consistent response format
+        if (response.data.success === false) {
+            throw new Error(response.data.message || 'Failed to fetch user data');
+        }
+        
+        return {
+            success: true,
+            user: response.data.user || response.data,
+            message: response.data.message || 'User data retrieved successfully'
+        };
+    } catch (error: any) {
+        console.error('Get user error:', error);
+        throw error;
+    }
+};
+
 // Forgot Password Function
 export const forgotPassword = async (data: any) => {
     const response = await AuthAPI.post("/forgot-password", data);
@@ -147,8 +171,7 @@ export const updatePassword = async (user_id: string, newPassword: string, curre
     const response = await AuthAPI.put("/api/update-password", {
         user_id,
         current_password: currentPassword,
-        new_password: newPassword,
-        password_confirmation: newPassword
+        new_password: newPassword
     });
     return response.data;
 };

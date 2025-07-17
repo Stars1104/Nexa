@@ -55,12 +55,12 @@ export const CreatorProfile = () => {
     const displayProfile = {
         name: profile?.name || user?.name || defaultProfile.name,
         email: profile?.email || user?.email || defaultProfile.email,
-        state: profile?.location || defaultProfile.state,
+        state: profile?.location || profile?.state || defaultProfile.state,
         role: profile?.role || user?.role || defaultProfile.role,
         languages: profile?.languages || defaultProfile.languages,
         gender: profile?.gender || defaultProfile.gender,
         categories: profile?.categories || defaultProfile.categories,
-        image: profile?.avatar || null,
+        image: profile?.avatar || profile?.avatar_url || null,
         has_premium: profile?.has_premium || false,
     };
 
@@ -77,7 +77,7 @@ export const CreatorProfile = () => {
                     : updatedProfile.languages?.split(',').map((l: string) => l.trim()),
                 gender: updatedProfile.gender,
                 categories: updatedProfile.categories,
-                image: updatedProfile.image, // File object if uploaded
+                avatar: updatedProfile.image, // File object if uploaded
             };
 
             await dispatch(updateUserProfile(profileData)).unwrap();

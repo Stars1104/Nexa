@@ -7,7 +7,7 @@ import BrandDashboard from "../../components/brand/BrandDashboard";
 import AllowedCampaigns from "../../components/brand/AllowedCampaigns";
 import BrandProfile from "@/components/brand/BrandProfile";
 import NotFound from "../NotFound";
-import Chat from "@/components/Chat";
+import ChatPage from "./ChatPage";
 import ViewCreators from "@/components/brand/ViewCreators";
 import ViewApplication from "@/components/brand/ViewApplication";
 import CreateCampaign from "@/components/brand/CreateCampaign";
@@ -27,7 +27,7 @@ const Index = () => {
                 case "Meu perfil":
                     return <BrandProfile />;
                 case "Chat":
-                    return <Chat />
+                    return <ChatPage setComponent={setComponent} />
                 case "Nova campanha":
                     return <CreateCampaign />
                 case "Pagamentos":

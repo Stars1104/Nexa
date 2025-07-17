@@ -4,6 +4,7 @@ import { fetchCampaignApplications, approveApplication, rejectApplication } from
 import { toast } from "../ui/sonner";
 import { Button } from "../ui/button";
 import { Link as LinkIcon, DollarSign, Calendar, X } from "lucide-react";
+import { useBrandChatNavigation } from "../../hooks/useBrandChatNavigation";
 
 function getInitials(name?: string) {
   if (!name) return "";
@@ -23,6 +24,8 @@ const ViewCreators: React.FC<ViewCreatorsProps> = ({ setComponent, campaignId, c
   const { applications, isLoading, error } = useAppSelector((state) => state.campaign);
   const [selectedApp, setSelectedApp] = useState<any | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const { navigateToChatWithRoom } = useBrandChatNavigation();
 
   useEffect(() => {
     if (campaignId) {
@@ -122,11 +125,29 @@ const ViewCreators: React.FC<ViewCreatorsProps> = ({ setComponent, campaignId, c
               <div className="flex gap-2 w-full sm:w-auto justify-end">
                 {isApproved ? (
                   <button 
-                    className="flex items-center gap-2 px-6 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors text-sm sm:text-base shadow-sm"
-                    onClick={e => { e.stopPropagation(); setComponent?.("Chat"); }}
+                    className="flex items-center gap-2 px-6 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors text-sm sm:text-base shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={async (e) => { 
+                      e.stopPropagation(); 
+                      setIsCreatingChat(true);
+                      try {
+                        await navigateToChatWithRoom(campaignId, app.creator.id, setComponent);
+                      } finally {
+                        setIsCreatingChat(false);
+                      }
+                    }}
+                    disabled={isCreatingChat}
                   >
-                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    Chat
+                    {isCreatingChat ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Criando...
+                      </>
+                    ) : (
+                      <>
+                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        Chat
+                      </>
+                    )}
                   </button>
                 ) : (
                   <button 

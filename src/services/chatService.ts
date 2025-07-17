@@ -9,7 +9,6 @@ export interface ChatRoom {
         id: number;
         name: string;
         avatar?: string;
-        online: boolean;
     };
     last_message?: {
         id: number;
@@ -53,7 +52,7 @@ export interface ChatRoomResponse {
 }
 
 class ChatService {
-    // Get user's chat rooms
+    // Get user's chat rooms (campaign-based)
     async getChatRooms(): Promise<ChatRoom[]> {
         try {
             const response = await apiClient.get('/chat/rooms');
@@ -102,19 +101,19 @@ class ChatService {
         return response.data.data;
     }
 
-    // Update online status
-    async updateOnlineStatus(isOnline: boolean, socketId?: string): Promise<void> {
-        await apiClient.post('/chat/online-status', {
-            is_online: isOnline,
-            socket_id: socketId,
-        });
-    }
-
     // Update typing status
     async updateTypingStatus(roomId: string, isTyping: boolean): Promise<void> {
         await apiClient.post('/chat/typing-status', {
             room_id: roomId,
             is_typing: isTyping,
+        });
+    }
+
+    // Mark messages as read
+    async markMessagesAsRead(roomId: string, messageIds: number[]): Promise<void> {
+        await apiClient.post('/chat/mark-read', {
+            room_id: roomId,
+            message_ids: messageIds,
         });
     }
 }

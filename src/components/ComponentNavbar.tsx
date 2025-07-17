@@ -197,9 +197,9 @@ const CreatorNavbar = ({ title }: CreatorNavbarProps) => {
           </button>
 
           {/* User Dropdown Menu */}
-          {showUserMenu && (
-            <div className="absolute right-0 top-full mt-2 w-64 bg-background border rounded-lg shadow-lg z-50 dark:bg-[#171717]">
-              <Card>
+          {showUserMenu && typeof document !== 'undefined' && createPortal(
+            <div className="fixed right-4 top-16 w-64 bg-background border rounded-lg shadow-lg z-[2147483647] dark:bg-[#171717]" style={{ pointerEvents: 'auto' }}>
+              <Card onClick={(e) => e.stopPropagation()}>
                 <CardContent className="p-0">
                   <div className="p-4 border-b">
                     <div className="flex items-center gap-3">
@@ -219,8 +219,17 @@ const CreatorNavbar = ({ title }: CreatorNavbarProps) => {
                   <div className="py-2">
                     <button
                       type="button"
-                      className="flex items-center gap-3 w-full p-3 hover:bg-accent/50 text-left transition-colors text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 cursor-pointer"
-                      onClick={handleLogout}
+                      className="flex items-center gap-3 w-full p-3 hover:bg-accent/50 text-left transition-colors text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 cursor-pointer relative z-[2147483647]"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleLogout(e);
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      style={{ pointerEvents: 'auto' }}
                     >
                       <LogOut className="w-4 h-4" />
                       <span className="text-sm">Logout</span>
@@ -228,7 +237,8 @@ const CreatorNavbar = ({ title }: CreatorNavbarProps) => {
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       </div>

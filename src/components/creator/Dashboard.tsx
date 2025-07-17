@@ -125,7 +125,7 @@ export default function Dashboard({ setComponent, setProjectId }: DashboardProps
     const [statusFilter, setStatusFilter] = useState<string>("all");
 
     // Ensure approvedCampaigns is always an array
-    const campaigns = Array.isArray(approvedCampaigns.data) ? approvedCampaigns.data : [];
+    const campaigns = approvedCampaigns?.data && Array.isArray(approvedCampaigns.data) ? approvedCampaigns.data : [];
 
     // Fetch approved campaigns on component mount
     useEffect(() => {

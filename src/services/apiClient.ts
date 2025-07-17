@@ -41,7 +41,7 @@ apiClient.interceptors.response.use(
         });
         return response;
     },
-    (error) => {
+    async (error) => {
         console.error('API Error:', {
             url: error.config?.url,
             method: error.config?.method,
@@ -57,9 +57,23 @@ apiClient.interceptors.response.use(
             // Don't automatically clear token, let the auth hook handle it
         }
         
-        // Handle 419 CSRF Token Mismatch
+        // Handle 419 CSRF Token Mismatch with retry
         if (error.response?.status === 419) {
-            console.log('CSRF token mismatch, this might be a session issue');
+            console.log('CSRF token mismatch, attempting to refresh session...');
+            
+            // Try to refresh the session by making a GET request
+            try {
+                await apiClient.get('/user');
+                console.log('Session refreshed, retrying original request...');
+                
+                // Retry the original request
+                const originalRequest = error.config;
+                return apiClient.request(originalRequest);
+            } catch (refreshError) {
+                console.log('Failed to refresh session:', refreshError);
+                // If refresh fails, suggest user to refresh the page
+                error.message = 'Session expired. Please refresh the page and try again.';
+            }
         }
         
         return Promise.reject(error);

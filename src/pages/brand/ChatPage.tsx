@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ScrollArea } from "./ui/scroll-area";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
-import { Badge } from "./ui/badge";
-import { cn } from "../lib/utils";
+import { ScrollArea } from "../../components/ui/scroll-area";
+import { Input } from "../../components/ui/input";
+import { Button } from "../../components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "../../components/ui/avatar";
+import { Badge } from "../../components/ui/badge";
+import { cn } from "../../lib/utils";
 import { 
     SearchIcon, 
     Send, 
@@ -16,17 +16,25 @@ import {
     X,
     Check,
     Clock,
+    ArrowLeft,
+    User,
+    Mail,
+    Phone,
     Download,
     ExternalLink,
     MoreVertical,
     Eye
 } from "lucide-react";
-import { useSocket } from "../hooks/useSocket";
-import { chatService, ChatRoom, Message } from "../services/chatService";
-import { useAppSelector } from "../store/hooks";
+import { useSocket } from "../../hooks/useSocket";
+import { chatService, ChatRoom, Message } from "../../services/chatService";
+import { useAppSelector } from "../../store/hooks";
 import { format, isToday, isYesterday } from "date-fns";
 
-export default function Chat() {
+interface ChatPageProps {
+    setComponent?: (component: string) => void;
+}
+
+export default function ChatPage({ setComponent }: ChatPageProps) {
     const { user } = useAppSelector((state) => state.auth);
     const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
     const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
@@ -39,14 +47,15 @@ export default function Chat() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [filePreview, setFilePreview] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
-    const [openDropdowns, setOpenDropdowns] = useState<Set<number>>(new Set());
+    const [openDropdowns, setOpenDropdowns] = useState<{ [key: string]: boolean }>({});
     
-    console.log("TYPE", typingUsers); // Debug log to track typing users
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isMountedRef = useRef(true);
+
+    console.log("TYPE", typingUsers)
 
     // Socket.IO hook
     const {
@@ -60,7 +69,6 @@ export default function Chat() {
         stopTyping,
         markMessagesAsRead,
         reconnect,
-        onMessagesRead,
     } = useSocket();
 
     // Component mount/unmount tracking
@@ -96,13 +104,25 @@ export default function Chat() {
         };
     }, [selectedRoom]);
 
-    // Auto-join room when selectedRoom changes
+    // Clear typing users when room changes
     useEffect(() => {
-        if (selectedRoom && isConnected) {
-            console.log('Auto-joining room:', selectedRoom.room_id);
-            joinRoom(selectedRoom.room_id);
+        console.log('Room changed - clearing typing users');
+        setTypingUsers(new Set());
+    }, [selectedRoom?.room_id]);
+
+    // Check for selected room from localStorage
+    useEffect(() => {
+        if (!isMountedRef.current) return;
+        
+        const selectedRoomId = localStorage.getItem('selectedChatRoom');
+        if (selectedRoomId && chatRooms.length > 0) {
+            const room = chatRooms.find(r => r.room_id === selectedRoomId);
+            if (room) {
+                setSelectedRoom(room);
+                localStorage.removeItem('selectedChatRoom'); // Clear after use
+            }
         }
-    }, [selectedRoom, isConnected, joinRoom]);
+    }, [chatRooms]);
 
     // Auto-scroll to bottom when new messages arrive
     useEffect(() => {
@@ -122,29 +142,41 @@ export default function Chat() {
         requestAnimationFrame(scrollToBottom);
     }, [messages]);
 
-    // Socket event listeners
+    // Join/leave room when selection changes
+    useEffect(() => {
+        if (!isMountedRef.current) return;
+        
+        if (selectedRoom) {
+            joinRoom(selectedRoom.room_id);
+            loadMessages(selectedRoom.room_id);
+            
+            return () => {
+                if (isMountedRef.current) {
+                    leaveRoom(selectedRoom.room_id);
+                }
+            };
+        }
+    }, [selectedRoom, joinRoom, leaveRoom]);
+
+    // Socket event listeners for real-time updates
     useEffect(() => {
         if (!socket || !isMountedRef.current) return;
 
         // Listen for new messages from other users
         const handleNewMessage = (data: any) => {
-            console.log('Received new message:', data);
             if (!isMountedRef.current) return;
             
             if (data.roomId === selectedRoom?.room_id) {
-                console.log('Message is for current room:', selectedRoom.room_id);
                 // Only add message if it's from another user (not the current user)
                 if (data.senderId !== user?.id) {
-                    console.log('Adding message from other user:', data.senderName);
-                    const messageId = data.messageId || Math.floor(Date.now() / 1000);
                     const newMessage: Message = {
-                        id: messageId,
+                        id: data.messageId || Date.now(), // Use server ID if available
                         message: data.message,
-                        message_type: data.messageType || 'text',
+                        message_type: data.messageType,
                         sender_id: data.senderId,
                         sender_name: data.senderName,
                         sender_avatar: data.senderAvatar,
-                        is_sender: false, // This is from another user
+                        is_sender: data.senderId === user?.id,
                         file_path: data.fileData?.file_path,
                         file_name: data.fileData?.file_name,
                         file_size: data.fileData?.file_size,
@@ -156,15 +188,9 @@ export default function Chat() {
                     
                     setMessages(prev => [...prev, newMessage]);
                     
-                    // Mark as read immediately if it's not from current user
-                    markMessagesAsRead(data.roomId, [messageId]).catch(error => {
-                        console.warn('Error marking message as read:', error);
-                    });
-                } else {
-                    console.log('Ignoring message from self');
+                    // Mark as read if it's not from current user
+                    markMessagesAsRead(data.roomId, [newMessage.id]);
                 }
-            } else {
-                console.log('Message is not for current room. Expected:', selectedRoom?.room_id, 'Got:', data.roomId);
             }
             
             // Update conversation list
@@ -198,7 +224,7 @@ export default function Chat() {
             }
         };
 
-        // Listen for read receipts from other users
+        // Listen for read receipts
         const handleMessagesRead = (data: any) => {
             if (!isMountedRef.current) return;
             
@@ -228,25 +254,6 @@ export default function Chat() {
         };
     }, [socket, selectedRoom, user, markMessagesAsRead]);
 
-    // Listen for read receipt updates from other users using the new hook function
-    useEffect(() => {
-        if (!isMountedRef.current) return;
-
-        const cleanup = onMessagesRead((data) => {
-            if (data.roomId === selectedRoom?.room_id) {
-                setMessages(prev => 
-                    prev.map(msg => 
-                        data.messageIds.includes(msg.id) 
-                            ? { ...msg, is_read: true, read_at: data.timestamp }
-                            : msg
-                    )
-                );
-            }
-        });
-
-        return cleanup;
-    }, [onMessagesRead, selectedRoom]);
-
     // Auto-clear typing users after 3 seconds to prevent them from persisting
     useEffect(() => {
         if (typingUsers.size > 0) {
@@ -261,66 +268,61 @@ export default function Chat() {
         }
     }, [typingUsers]);
 
-    // Clear typing users when room changes
+    // Cleanup typing indicators when component unmounts or user navigates away
     useEffect(() => {
-        console.log('Room changed - clearing typing users');
-        setTypingUsers(new Set());
-    }, [selectedRoom?.room_id]);
+        const handleBeforeUnload = () => {
+            if (selectedRoom && isCurrentUserTyping) {
+                stopTyping(selectedRoom.room_id);
+            }
+        };
 
-    // Load chat rooms from API
+        const handleVisibilityChange = () => {
+            if (document.hidden && selectedRoom && isCurrentUserTyping) {
+                if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                    typingTimeoutRef.current = null;
+                }
+                setIsCurrentUserTyping(false);
+                stopTyping(selectedRoom.room_id);
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            
+            // Cleanup typing indicators on unmount
+            if (selectedRoom && isCurrentUserTyping) {
+                if (typingTimeoutRef.current) {
+                    clearTimeout(typingTimeoutRef.current);
+                    typingTimeoutRef.current = null;
+                }
+                setIsCurrentUserTyping(false);
+                stopTyping(selectedRoom.room_id);
+            }
+        };
+    }, [selectedRoom, isCurrentUserTyping, stopTyping]);
+
     const loadChatRooms = async () => {
         if (!isMountedRef.current) return;
         
         try {
-            console.log('Loading chat rooms...');
-            
-            const roomsData = await chatService.getChatRooms();
+            setIsLoading(true);
+            const rooms = await chatService.getChatRooms();
             if (isMountedRef.current) {
-                setChatRooms(roomsData);
-                
-                // Auto-select first room if none selected and rooms exist
-                if (!selectedRoom && roomsData.length > 0) {
-                    console.log('Auto-selecting first room:', roomsData[0].room_id);
-                    handleConversationSelect(roomsData[0]);
+                setChatRooms(rooms);
+                if (rooms.length > 0 && !selectedRoom) {
+                    setSelectedRoom(rooms[0]);
                 }
             }
         } catch (error) {
             console.error('Error loading chat rooms:', error);
-        }
-    };
-
-    // Load messages for a specific room
-    const loadMessages = async (room: ChatRoom) => {
-        if (!isMountedRef.current) return;
-        
-        try {
-            setIsLoading(true);
-            const response = await chatService.getMessages(room.room_id);
-            if (isMountedRef.current) {
-            setMessages(response.messages);
-            
-            // Join the room for real-time updates
-            joinRoom(room.room_id);
-                
-                // Mark all unread messages from other users as read
-                const unreadMessages = response.messages.filter(
-                    msg => !msg.is_sender && !msg.is_read
-                );
-                
-                if (unreadMessages.length > 0) {
-                    const messageIds = unreadMessages.map(msg => msg.id).filter((id): id is number => id !== undefined);
-                    if (messageIds.length > 0) {
-                        markMessagesAsRead(room.room_id, messageIds).catch(error => {
-                            console.warn('Error marking messages as read:', error);
-                        });
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Error loading messages:', error);
         } finally {
             if (isMountedRef.current) {
-            setIsLoading(false);
+                setIsLoading(false);
             }
         }
     };
@@ -342,16 +344,10 @@ export default function Chat() {
         // Clear typing users for previous room
         setTypingUsers(new Set());
         
-        // Leave previous room
-        if (selectedRoom) {
-            leaveRoom(selectedRoom.room_id);
-        }
-        
         setSelectedRoom(room);
-        setSidebarOpen(false);
         
         // Load messages for the selected room
-        await loadMessages(room);
+        await loadMessages(room.room_id);
         
         // Focus input
         setTimeout(() => {
@@ -361,7 +357,19 @@ export default function Chat() {
         }, 100);
     };
 
-    // Handle sending message
+    const loadMessages = async (roomId: string) => {
+        if (!isMountedRef.current) return;
+        
+        try {
+            const response = await chatService.getMessages(roomId);
+            if (isMountedRef.current) {
+                setMessages(response.messages);
+            }
+        } catch (error) {
+            console.error('Error loading messages:', error);
+        }
+    };
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedRoom || (!input.trim() && !selectedFile)) return;
@@ -378,7 +386,7 @@ export default function Chat() {
             } else {
                 newMessage = await sendMessage(selectedRoom.room_id, input.trim());
             }
-            
+
             if (isMountedRef.current) {
                 // Add the message to the UI immediately for better UX
                 // The message from the API response is already complete with proper ID
@@ -392,41 +400,12 @@ export default function Chat() {
                 }
                 setIsCurrentUserTyping(false);
                 stopTyping(selectedRoom.room_id);
-                
-                // Focus input after sending
-                setTimeout(() => {
-                    if (inputRef.current && isMountedRef.current) {
-                        inputRef.current.focus();
-                    }
-                }, 100);
             }
         } catch (error) {
             console.error('Error sending message:', error);
         }
     };
 
-    // Handle file selection
-    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (!isMountedRef.current) return;
-        
-        const file = event.target.files?.[0];
-        if (file) {
-            setSelectedFile(file);
-            
-            // Create preview for images
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    if (isMountedRef.current) {
-                    setFilePreview(e.target?.result as string);
-                    }
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-    };
-
-    // Handle input change with typing indicators
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!isMountedRef.current) return;
         
@@ -492,105 +471,79 @@ export default function Chat() {
         }
     };
 
-    // Close sidebar when clicking outside
-    useEffect(() => {
-        if (!sidebarOpen) return;
-
-        const handleClickOutside = (event: MouseEvent) => {
-            if (!isMountedRef.current) return;
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!isMountedRef.current) return;
+        
+        const file = e.target.files?.[0];
+        if (file) {
+            setSelectedFile(file);
             
-                const sidebar = document.querySelector('[data-sidebar]');
-                const hamburger = document.querySelector('[data-hamburger]');
-            
-                if (sidebar && !sidebar.contains(event.target as Node) &&
-                    hamburger && !hamburger.contains(event.target as Node)) {
-                    setSidebarOpen(false);
+            // Create preview for images
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    if (isMountedRef.current) {
+                        setFilePreview(e.target?.result as string);
+                    }
+                };
+                reader.readAsDataURL(file);
             }
-        };
+        }
+    };
 
-        const handleEscape = (event: KeyboardEvent) => {
-            if (!isMountedRef.current) return;
-            
-            if (event.key === 'Escape') {
-                setSidebarOpen(false);
-            }
-        };
+    const handleBackNavigation = () => {
+        // Ensure all cleanup is done before navigation
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+        }
+        
+        // Clear any file selections
+        setSelectedFile(null);
+        setFilePreview(null);
+        
+        // Navigate back
+        setComponent?.("Minhas campanhas");
+    };
 
-        document.addEventListener('mousedown', handleClickOutside);
-        document.addEventListener('keydown', handleEscape);
+    const filteredRooms = chatRooms.filter(room =>
+        room.other_user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        room.campaign_title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-            document.removeEventListener('keydown', handleEscape);
-        };
-    }, [sidebarOpen]);
-
-    // Cleanup typing indicators when component unmounts or user navigates away
-    useEffect(() => {
-        const handleBeforeUnload = () => {
-            if (selectedRoom && isCurrentUserTyping) {
-                stopTyping(selectedRoom.room_id);
-            }
-        };
-
-        const handleVisibilityChange = () => {
-            if (document.hidden && selectedRoom && isCurrentUserTyping) {
-                if (typingTimeoutRef.current) {
-                    clearTimeout(typingTimeoutRef.current);
-                    typingTimeoutRef.current = null;
-                }
-                setIsCurrentUserTyping(false);
-                stopTyping(selectedRoom.room_id);
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            
-            // Cleanup typing indicators on unmount
-            if (selectedRoom && isCurrentUserTyping) {
-                if (typingTimeoutRef.current) {
-                    clearTimeout(typingTimeoutRef.current);
-                    typingTimeoutRef.current = null;
-                }
-                setIsCurrentUserTyping(false);
-                stopTyping(selectedRoom.room_id);
-            }
-        };
-    }, [selectedRoom, isCurrentUserTyping, stopTyping]);
+    const formatMessageTime = (dateString: string) => {
+        const date = new Date(dateString);
+        if (isToday(date)) {
+            return format(date, 'HH:mm');
+        } else if (isYesterday(date)) {
+            return 'Yesterday';
+        } else {
+            return format(date, 'MMM d');
+        }
+    };
 
     // File Dropdown Component
     const FileDropdown = ({ message }: { message: Message }) => {
         const dropdownRef = useRef<HTMLDivElement>(null);
-        const isOpen = openDropdowns.has(message.id);
+        const isOpen = openDropdowns[message.id];
         const [isDownloading, setIsDownloading] = useState(false);
 
         const toggleDropdown = (e: React.MouseEvent) => {
             e.stopPropagation();
-            setOpenDropdowns(prev => {
-                const newSet = new Set(prev);
-                if (newSet.has(message.id)) {
-                    newSet.delete(message.id);
-                } else {
-                    newSet.add(message.id);
-                }
-                return newSet;
-            });
+            setOpenDropdowns(prev => ({
+                ...prev,
+                [message.id]: !prev[message.id]
+            }));
         };
 
         const handleOpen = () => {
             if (message.file_url) {
                 window.open(message.file_url, '_blank');
             }
-            setOpenDropdowns(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(message.id);
-                return newSet;
-            });
+            setOpenDropdowns(prev => ({
+                ...prev,
+                [message.id]: false
+            }));
         };
 
         const handleDownload = async () => {
@@ -697,22 +650,20 @@ export default function Chat() {
                     setIsDownloading(false);
                 }
             }
-            setOpenDropdowns(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(message.id);
-                return newSet;
-            });
+            setOpenDropdowns(prev => ({
+                ...prev,
+                [message.id]: false
+            }));
         };
 
         // Close dropdown when clicking outside
         useEffect(() => {
             const handleClickOutside = (event: MouseEvent) => {
                 if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                    setOpenDropdowns(prev => {
-                        const newSet = new Set(prev);
-                        newSet.delete(message.id);
-                        return newSet;
-                    });
+                    setOpenDropdowns(prev => ({
+                        ...prev,
+                        [message.id]: false
+                    }));
                 }
             };
 
@@ -811,28 +762,12 @@ export default function Chat() {
         return <p className="text-sm">{message.message}</p>;
     };
 
-    const formatMessageTime = (dateString: string) => {
-        const date = new Date(dateString);
-        if (isToday(date)) {
-            return format(date, 'HH:mm');
-        } else if (isYesterday(date)) {
-            return 'Yesterday';
-        } else {
-            return format(date, 'MMM d');
-        }
-    };
-
-    const filteredRooms = chatRooms.filter(room =>
-        room.other_user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        room.campaign_title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
     return (
         <div className="flex h-full bg-background">
             {/* Mobile Hamburger Button */}
             <button
                 data-hamburger
-                className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-xl bg-white dark:bg-slate-800 shadow-lg"
+                className="md:hidden fixed top-4 left-16 z-50 p-2 rounded-xl bg-white dark:bg-slate-800 shadow-lg"
                 onClick={() => setSidebarOpen(true)}
                 aria-label="Open conversations"
             >
@@ -919,7 +854,7 @@ export default function Chat() {
                                 filteredRooms.map((room) => (
                                     <div
                                         key={room.id}
-                                        onClick={() => handleConversationSelect(room)}
+                                        onClick={() => setSelectedRoom(room)}
                                         className={cn(
                                             "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 mb-2",
                                             selectedRoom?.id === room.id
@@ -1172,4 +1107,4 @@ export default function Chat() {
             )}
         </div>
     );
-}
+} 

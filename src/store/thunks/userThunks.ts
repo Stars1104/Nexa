@@ -8,7 +8,7 @@ import {
   updateProfileSuccess,
   updateProfileFailure 
 } from '../slices/userSlice';
-import { getProfile, profileUpdate } from '../../api/auth';
+import { getProfile, profileUpdate, getUser } from '../../api/auth';
 import { handleApiError } from '../../lib/api-error-handler';
 
 // Async thunk for fetching user profile
@@ -34,6 +34,30 @@ export const fetchUserProfile = createAsyncThunk(
   }
 );
 
+// Async thunk for fetching comprehensive user data for editing
+export const fetchUserForEditing = createAsyncThunk(
+  'user/fetchUserForEditing',
+  async (userId: string | undefined = undefined, { dispatch, rejectWithValue }) => {
+    try {
+      dispatch(fetchProfileStart());
+      
+      const response = await getUser(userId);
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch user data');
+      }
+
+      // Use the same success action since we're storing user data
+      dispatch(fetchProfileSuccess(response.user));
+      return response.user;
+    } catch (error: unknown) {
+      const apiError = handleApiError(error);
+      dispatch(fetchProfileFailure(apiError.message));
+      return rejectWithValue(apiError.message);
+    }
+  }
+);
+
 // Async thunk for updating user profile
 export const updateUserProfile = createAsyncThunk(
   'user/updateProfile',
@@ -43,13 +67,13 @@ export const updateUserProfile = createAsyncThunk(
       
       // If there's an image file, we need to create FormData for file upload
       let dataToSend;
-      if (profileData.image && profileData.image instanceof File) {
+      if (profileData.avatar && profileData.avatar instanceof File) {
         const formData = new FormData();
         
         // Add all profile fields to FormData
         Object.keys(profileData).forEach(key => {
-          if (key === 'image') {
-            formData.append('avatar', profileData.image);
+          if (key === 'avatar') {
+            formData.append('avatar', profileData.avatar);
           } else if (key === 'languages' && Array.isArray(profileData[key])) {
             formData.append('languages', JSON.stringify(profileData[key]));
           } else if (key === 'categories' && Array.isArray(profileData[key])) {
@@ -62,7 +86,7 @@ export const updateUserProfile = createAsyncThunk(
         dataToSend = formData;
       } else {
         // Regular JSON data
-        const { image, ...otherData } = profileData;
+        const { avatar, ...otherData } = profileData;
         dataToSend = otherData;
       }
       

@@ -52,8 +52,25 @@ export const UpdatePasswordModal: React.FC<UpdatePasswordModalProps> = ({
 
     if (!formData.newPassword.trim()) {
       newErrors.newPassword = "New password is required";
-    } else if (formData.newPassword.length < 6) {
-      newErrors.newPassword = "New password must be at least 6 characters";
+    } else if (formData.newPassword.length < 8) {
+      newErrors.newPassword = "New password must be at least 8 characters";
+    } else {
+      // Check for at least 1 number
+      if (!/\d/.test(formData.newPassword)) {
+        newErrors.newPassword = "Password must contain at least 1 number";
+      }
+      // Check for at least 1 uppercase letter
+      else if (!/[A-Z]/.test(formData.newPassword)) {
+        newErrors.newPassword = "Password must contain at least 1 uppercase letter";
+      }
+      // Check for at least 1 special character
+      else if (!/[^a-zA-Z0-9]/.test(formData.newPassword)) {
+        newErrors.newPassword = "Password must contain at least 1 special character";
+      }
+      // Check for at least 1 lowercase letter
+      else if (!/[a-z]/.test(formData.newPassword)) {
+        newErrors.newPassword = "Password must contain at least 1 lowercase letter";
+      }
     }
 
     if (!formData.confirmPassword.trim()) {

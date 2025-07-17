@@ -1,4 +1,5 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
+import { getProfile } from '../../api/auth';
 
 interface User {
   id: string;
@@ -27,6 +28,55 @@ const initialState: AuthState = {
   error: null,
   isSigningUp: false,
 };
+
+// Async thunk for checking authentication status
+export const checkAuthStatus = createAsyncThunk(
+  'auth/checkAuthStatus',
+  async (_, { getState, dispatch }) => {
+    const state = getState() as { auth: AuthState };
+    const { token } = state.auth;
+    
+    // If no token in state, check localStorage
+    if (!token) {
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      
+      if (storedToken && storedUser) {
+        try {
+          // Validate token with backend
+          const response = await getProfile();
+          if (response.success) {
+            return {
+              user: response.profile,
+              token: storedToken
+            };
+          }
+        } catch (error) {
+          // Token is invalid, clear localStorage
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          throw new Error('Invalid token');
+        }
+      }
+      throw new Error('No valid authentication found');
+    }
+    
+    // If token exists in state, validate it
+    try {
+      const response = await getProfile();
+      if (response.success) {
+        return {
+          user: response.profile,
+          token: token
+        };
+      }
+    } catch (error) {
+      // Token is invalid, clear state
+      dispatch(logout());
+      throw new Error('Invalid token');
+    }
+  }
+);
 
 const authSlice = createSlice({
   name: 'auth',
@@ -81,14 +131,6 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
-    // New action to handle initial authentication check
-    checkAuthStatus: (state) => {
-      if (state.token && state.user) {
-        state.isAuthenticated = true;
-      } else {
-        state.isAuthenticated = false;
-      }
-    },
     // Toggle premium status (for testing)
     togglePremium: (state) => {
       if (state.user) {
@@ -102,6 +144,26 @@ const authSlice = createSlice({
       }
     },
   },
+  extraReducers: (builder) => {
+    builder
+      .addCase(checkAuthStatus.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(checkAuthStatus.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isAuthenticated = true;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+      })
+      .addCase(checkAuthStatus.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isAuthenticated = false;
+        state.user = null;
+        state.token = null;
+        state.error = action.error.message || 'Authentication check failed';
+      });
+  },
 });
 
 export const { 
@@ -113,7 +175,6 @@ export const {
   signupFailure, 
   logout, 
   clearError,
-  checkAuthStatus,
   togglePremium,
   toggleAdminRole
 } = authSlice.actions;
