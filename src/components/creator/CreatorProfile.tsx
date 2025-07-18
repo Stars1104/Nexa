@@ -77,23 +77,14 @@ export const CreatorProfile = () => {
 
     const handleSaveProfile = useCallback(async (updatedProfile: any) => {
 
-        console.log("Updated profile", updatedProfile);
-
-        if (isUpdating) {
-            console.log('Profile update already in progress, skipping...');
-            return;
-        }
-
         setIsUpdating(true);
         
         try {
-            console.log('Starting profile update with data:', updatedProfile);
-            
             // Map form data to API format, matching backend expectations
             const profileData: any = {
                 name: updatedProfile.name,
                 email: updatedProfile.email,
-                location: updatedProfile.state, // Backend expects 'location' for state
+                state: updatedProfile.state, // Send state directly instead of mapping to location
                 role: updatedProfile.role,
                 gender: updatedProfile.gender,
             };
@@ -112,10 +103,10 @@ export const CreatorProfile = () => {
             }
 
             // Update profile
-            const updateResult = await dispatch(updateUserProfile(profileData)).unwrap();
+            await dispatch(updateUserProfile(profileData)).unwrap();
 
             // Refetch the latest profile from backend
-            const fetchResult = await dispatch(fetchUserProfile()).unwrap();
+            await dispatch(fetchUserProfile()).unwrap();
 
             // Exit edit mode first, then show success message
             setEditMode(false);
@@ -269,7 +260,7 @@ export const CreatorProfile = () => {
                                 <div className="w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-400 flex items-center justify-center text-2xl font-bold text-purple-600 dark:text-white mb-2">
                                     {displayProfile.image ? (
                                         <img 
-                                            src={`http://localhost:8000${displayProfile.image}`} 
+                                            src={`${displayProfile.image}`} 
                                             alt="Profile" 
                                             className="w-16 h-16 rounded-full object-cover"
                                         />

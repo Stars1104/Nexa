@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { useAuthRehydration } from "./hooks/useAuthRehydration";
+import { useSocket } from "./hooks/useSocket";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Index from "./pages/Index";
@@ -12,15 +13,20 @@ import AuthStep from "./pages/auth/AuthStep";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import Signup from "./pages/auth/CreatorSignUp";
 import StudentVerify from "./pages/auth/StudentVerify";
+import GoogleOAuthCallback from "./components/GoogleOAuthCallback";
 import CreatorIndex from "./pages/creator/Index";
 import BrandIndex from "./pages/brand/Index";
 import AdminIndex from "./pages/admin";
+import NotificationsPage from "./pages/Notifications";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   // Initialize auth rehydration
   useAuthRehydration();
+  
+  // Initialize global socket connection for real-time notifications
+  useSocket();
 
   return (
     <ErrorBoundary>
@@ -36,6 +42,7 @@ const App = () => {
                 <Route path="/auth/signup" element={<Signup />} />
                 <Route path="/signup/:role" element={<Signup />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/auth/google/callback" element={<GoogleOAuthCallback />} />
                 <Route path="/student-verify" element={
                   <ProtectedRoute allowedRoles={['creator', 'student']}>
                     <StudentVerify />
@@ -54,6 +61,12 @@ const App = () => {
                 <Route path="/admin" element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <AdminIndex />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/notifications" element={
+                  <ProtectedRoute>
+                    <NotificationsPage />
                   </ProtectedRoute>
                 } />
                 

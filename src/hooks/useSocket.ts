@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useAppSelector } from '../store/hooks';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { apiClient } from '../services/apiClient';
 import { Message } from '../services/chatService';
+import { addNotification, incrementUnreadCount } from '../store/slices/notificationSlice';
 
 interface UseSocketReturn {
     socket: Socket | null;
@@ -18,8 +19,15 @@ interface UseSocketReturn {
     reconnect: () => void;
 }
 
-export const useSocket = (): UseSocketReturn => {
+interface UseSocketOptions {
+    enableNotifications?: boolean;
+    enableChat?: boolean;
+}
+
+export const useSocket = (options: UseSocketOptions = {}): UseSocketReturn => {
+    const { enableNotifications = true, enableChat = true } = options;
     const { user } = useAppSelector((state) => state.auth);
+    const dispatch = useAppDispatch();
     const socketRef = useRef<Socket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -135,8 +143,25 @@ export const useSocket = (): UseSocketReturn => {
             setConnectionError('Failed to reconnect. Please refresh the page.');
         });
 
+        // Listen for new notifications (only if enabled)
+        if (enableNotifications) {
+            socket.on('new_notification', (notificationData: any) => {
+                if (!isMountedRef.current) return;
+                
+                console.log('Received new notification:', notificationData);
+                
+                // Add notification to Redux store
+                dispatch(addNotification(notificationData));
+                
+                // Increment unread count if notification is unread
+                if (!notificationData.is_read) {
+                    dispatch(incrementUnreadCount());
+                }
+            });
+        }
+
         return socket;
-    }, [user]);
+    }, [user, enableNotifications]);
 
     // Component mount/unmount tracking
     useEffect(() => {
@@ -193,9 +218,9 @@ export const useSocket = (): UseSocketReturn => {
         initializeSocket();
     }, [initializeSocket]);
 
-    // Join a chat room
+    // Join a chat room (only if chat is enabled)
     const joinRoom = useCallback((roomId: string) => {
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current || !enableChat) return;
         
         if (socketRef.current && isConnected) {
             try {
@@ -204,11 +229,11 @@ export const useSocket = (): UseSocketReturn => {
                 console.warn('Error joining room:', error);
             }
         }
-    }, [isConnected]);
+    }, [isConnected, enableChat]);
 
-    // Leave a chat room
+    // Leave a chat room (only if chat is enabled)
     const leaveRoom = useCallback((roomId: string) => {
-        if (!isMountedRef.current) return;
+        if (!isMountedRef.current || !enableChat) return;
         
         if (socketRef.current && isConnected) {
             try {
@@ -217,11 +242,11 @@ export const useSocket = (): UseSocketReturn => {
                 console.warn('Error leaving room:', error);
             }
         }
-    }, [isConnected]);
+    }, [isConnected, enableChat]);
 
     // Send a message - This now returns the message for immediate UI update
     const sendMessage = useCallback(async (roomId: string, message: string, file?: File): Promise<Message> => {
-        if (!socketRef.current || !isConnected || !user || !isMountedRef.current) {
+        if (!socketRef.current || !isConnected || !user || !isMountedRef.current || !enableChat) {
             throw new Error('Socket not connected or user not authenticated');
         }
 
@@ -251,111 +276,89 @@ export const useSocket = (): UseSocketReturn => {
                 messageData = response.data.data;
             }
 
-            // Emit socket event for real-time delivery to other users
-            if (socketRef.current && isMountedRef.current) {
-                try {
-                    const socketData = {
-                        roomId,
-                        messageId: messageData.id, // Include the message ID
-                        message: messageData.message,
-                        senderId: messageData.sender_id,
-                        senderName: messageData.sender_name,
-                        senderAvatar: messageData.sender_avatar,
-                        messageType: messageData.message_type,
-                        fileData: messageData.file_path ? {
-                            file_path: messageData.file_path,
-                            file_name: messageData.file_name,
-                            file_size: messageData.file_size,
-                            file_type: messageData.file_type,
-                            file_url: messageData.file_url,
-                        } : undefined,
-                    };
-                    
-                    socketRef.current.emit('send_message', socketData);
-                } catch (error) {
-                    console.warn('Error emitting message:', error);
-                }
-            } else {
-                console.warn('Socket not available for message emission');
-            }
+            // Emit socket event for real-time delivery
+            socketRef.current.emit('send_message', {
+                roomId,
+                messageId: messageData.id,
+                message: messageData.message,
+                senderId: messageData.sender_id,
+                senderName: messageData.sender_name,
+                senderAvatar: messageData.sender_avatar,
+                messageType: messageData.message_type,
+                fileData: messageData.file_path ? {
+                    file_path: messageData.file_path,
+                    file_name: messageData.file_name,
+                    file_size: messageData.file_size,
+                    file_type: messageData.file_type,
+                    file_url: messageData.file_url,
+                } : undefined,
+            });
 
             return messageData;
         } catch (error) {
             console.error('Error sending message:', error);
             throw error;
         }
-    }, [isConnected, user]);
+    }, [isConnected, user, enableChat]);
 
     // Start typing indicator
     const startTyping = useCallback((roomId: string) => {
-        if (!isMountedRef.current) return;
-        
-        if (socketRef.current && isConnected && user) {
-            try {
-                socketRef.current.emit('typing_start', {
-                    roomId,
-                    userId: user.id,
-                    userName: user.name,
-                });
-            } catch (error) {
-                console.warn('Error starting typing indicator:', error);
-            }
-        } else {
-            console.warn('Cannot start typing: socket not connected or user not available');
+        if (!socketRef.current || !isConnected || !user || !isMountedRef.current || !enableChat) return;
+
+        try {
+            socketRef.current.emit('typing_start', {
+                roomId,
+                userId: user.id,
+                userName: user.name,
+            });
+        } catch (error) {
+            console.warn('Error starting typing indicator:', error);
         }
-    }, [isConnected, user]);
+    }, [isConnected, user, enableChat]);
 
     // Stop typing indicator
     const stopTyping = useCallback((roomId: string) => {
-        if (!isMountedRef.current) return;
-        
-        if (socketRef.current && isConnected && user) {
-            try {
-                socketRef.current.emit('typing_stop', {
-                    roomId,
-                    userId: user.id,
-                    userName: user.name,
-                });
-            } catch (error) {
-                console.warn('Error stopping typing indicator:', error);
-            }
-        } else {
-            console.warn('Cannot stop typing: socket not connected or user not available');
+        if (!socketRef.current || !isConnected || !user || !isMountedRef.current || !enableChat) return;
+
+        try {
+            socketRef.current.emit('typing_stop', {
+                roomId,
+                userId: user.id,
+                userName: user.name,
+            });
+        } catch (error) {
+            console.warn('Error stopping typing indicator:', error);
         }
-    }, [isConnected, user]);
+    }, [isConnected, user, enableChat]);
 
     // Mark messages as read
-    const markMessagesAsRead = useCallback(async (roomId: string, messageIds: number[]) => {
-        if (!isMountedRef.current) return;
-        
+    const markMessagesAsRead = useCallback(async (roomId: string, messageIds: number[]): Promise<void> => {
+        if (!socketRef.current || !isConnected || !user || !isMountedRef.current || !enableChat) {
+            throw new Error('Socket not connected or user not authenticated');
+        }
+
         try {
-            // First, call the backend API to mark messages as read in the database
-            await apiClient.post('/chat/mark-read', {
+            // Update read status via API
+            await apiClient.post('/chat/messages/mark-read', {
                 room_id: roomId,
                 message_ids: messageIds,
             });
 
-            // Then emit socket event for real-time notification to other users
-            if (socketRef.current && isConnected && user) {
-                try {
-                    socketRef.current.emit('mark_read', {
-                        roomId,
-                        messageIds,
-                        userId: user.id,
-                    });
-                } catch (error) {
-                    console.warn('Error emitting read receipt:', error);
-                }
-            }
+            // Emit socket event for real-time updates
+            socketRef.current.emit('mark_read', {
+                roomId,
+                messageIds,
+                userId: user.id,
+            });
         } catch (error) {
             console.error('Error marking messages as read:', error);
             throw error;
         }
-    }, [isConnected, user]);
+    }, [isConnected, user, enableChat]);
 
-    // Listen for read receipt updates from other users
+    // Set up message read callback
     const onMessagesRead = useCallback((callback: (data: { roomId: string; messageIds: number[]; readBy: number; timestamp: string }) => void) => {
-        if (!socketRef.current || !isConnected) return;
+        if (!socketRef.current || !enableChat) return;
 
         const handleMessagesRead = (data: any) => {
             if (!isMountedRef.current) return;
@@ -370,7 +373,7 @@ export const useSocket = (): UseSocketReturn => {
                 socketRef.current.off('messages_read', handleMessagesRead);
             }
         };
-    }, [isConnected]);
+    }, [enableChat]);
 
     return {
         socket: socketRef.current,

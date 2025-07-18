@@ -64,7 +64,10 @@ export const updateUserProfile = createAsyncThunk(
     try {
       dispatch(updateProfileStart());
       
-            // Always create FormData to ensure consistent data handling
+      console.log('=== PROFILE UPDATE DEBUG ===');
+      console.log('Input profileData:', profileData);
+      
+      // Always create FormData to ensure consistent data handling
       const formData = new FormData();
       
       // Add all profile fields to FormData, explicitly excluding avatar if not a file
@@ -73,7 +76,9 @@ export const updateUserProfile = createAsyncThunk(
           if (key === 'avatar') {
             if (profileData.avatar instanceof File) {
               formData.append('avatar', profileData.avatar);
+              console.log("Adding avatar file to FormData:", profileData.avatar.name, profileData.avatar.size);
             } else {
+              console.log("Skipping avatar - not a File:", typeof profileData.avatar);
             }
             return; // Skip to next iteration
           }
@@ -92,6 +97,16 @@ export const updateUserProfile = createAsyncThunk(
           console.log(`Skipping ${key}:`, profileData[key]);
         }
       });
+      
+      // Debug: Log all FormData entries
+      console.log("FormData contents:");
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}:`, value);
+      }
+      
+      // Log FormData size
+      const formDataEntries = Array.from(formData.entries());
+      console.log("FormData size:", formDataEntries.length);
       
       const response = await profileUpdate(formData);
       

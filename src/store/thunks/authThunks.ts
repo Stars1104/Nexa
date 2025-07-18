@@ -2,6 +2,7 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import { loginStart, loginSuccess, loginFailure, signupStart, signupSuccess, signupFailure, logout } from '../slices/authSlice';
 import { signup, signin, logout as logoutAPI, updatePassword } from '../../api/auth';
 import { handleApiError } from '../../lib/api-error-handler';
+import { initiateGoogleOAuth, handleOAuthCallback } from '../../api/auth/googleAuth';
 
 interface LoginCredentials {
   email: string;
@@ -125,6 +126,47 @@ export const updateUserPassword = createAsyncThunk(
       return response.message || 'Password updated successfully';
     } catch (error: unknown) {
       const apiError = handleApiError(error);
+      return rejectWithValue(apiError.message);
+    }
+  }
+);
+
+// Async thunk for Google OAuth initiation
+export const initiateGoogleOAuthFlow = createAsyncThunk(
+  'auth/googleOAuthInit',
+  async (role?: 'creator' | 'brand', { rejectWithValue }) => {
+    try {
+      await initiateGoogleOAuth(role);
+    } catch (error: unknown) {
+      const apiError = handleApiError(error);
+      return rejectWithValue(apiError.message);
+    }
+  }
+);
+
+// Async thunk for Google OAuth callback
+export const handleGoogleOAuthCallback = createAsyncThunk(
+  'auth/googleOAuthCallback',
+  async (_, { dispatch, rejectWithValue }) => {
+    try {
+      dispatch(loginStart());
+      
+      const response = await handleOAuthCallback();
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Google OAuth failed');
+      }
+
+      const authData: AuthResponse = {
+        user: response.user,
+        token: response.token,
+      };
+
+      dispatch(loginSuccess(authData));
+      return authData;
+    } catch (error: unknown) {
+      const apiError = handleApiError(error);
+      dispatch(loginFailure(apiError.message));
       return rejectWithValue(apiError.message);
     }
   }

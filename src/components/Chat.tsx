@@ -60,7 +60,7 @@ export default function Chat() {
         markMessagesAsRead,
         reconnect,
         onMessagesRead,
-    } = useSocket();
+    } = useSocket({ enableNotifications: false, enableChat: true });
 
     // Component mount/unmount tracking
     useEffect(() => {

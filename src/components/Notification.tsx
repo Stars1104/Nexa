@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -21,6 +21,18 @@ import {
     SelectTrigger,
     SelectValue,
 } from "./ui/select";
+import { useAppSelector, useAppDispatch } from "../store/hooks";
+import { 
+    fetchNotifications, 
+    markNotificationAsRead, 
+    markAllNotificationsAsRead, 
+    deleteNotification,
+    selectNotifications,
+    selectUnreadCount,
+    selectNotificationLoading,
+    selectNotificationError
+} from "../store/slices/notificationSlice";
+import { toast } from "sonner";
 
 interface NotificationItem {
     id: number;
@@ -32,66 +44,66 @@ interface NotificationItem {
     category: 'campaign' | 'payment' | 'application' | 'system';
 }
 
+// Map notification types to display types
+const getNotificationType = (type: string): 'success' | 'warning' | 'info' | 'error' => {
+    switch (type) {
+        case 'login_detected':
+        case 'new_project':
+        case 'project_approved':
+        case 'proposal_approved':
+            return 'success';
+        case 'project_rejected':
+        case 'proposal_rejected':
+            return 'error';
+        case 'new_message':
+            return 'info';
+        default:
+            return 'info';
+    }
+};
+
+// Map notification types to categories
+const getNotificationCategory = (type: string): 'campaign' | 'payment' | 'application' | 'system' => {
+    switch (type) {
+        case 'new_project':
+        case 'project_approved':
+        case 'project_rejected':
+            return 'campaign';
+        case 'proposal_approved':
+        case 'proposal_rejected':
+            return 'application';
+        case 'new_message':
+            return 'system';
+        case 'login_detected':
+        default:
+            return 'system';
+    }
+};
+
 const Notification = () => {
-    const [notifications, setNotifications] = useState<NotificationItem[]>([
-        {
-            id: 1,
-            title: "Nova Campanha Disponível",
-            message: "A marca ModaX está procurando criadores de conteúdo para a campanha 'Summer Look'",
-            time: "2 horas atrás",
-            type: 'info',
-            unread: true,
-            category: 'campaign'
-        },
-        {
-            id: 2,
-            title: "Aplicação Aprovada",
-            message: "Sua aplicação para a campanha 'TechSound Headphones' foi aprovada!",
-            time: "1 dia atrás",
-            type: 'success',
-            unread: true,
-            category: 'application'
-        },
-        {
-            id: 3,
-            title: "Pagamento Processado",
-            message: "Pagamento de R$ 750 foi processado com sucesso para sua conta",
-            time: "3 dias atrás",
-            type: 'success',
-            unread: false,
-            category: 'payment'
-        },
-        {
-            id: 4,
-            title: "Campanha Expirada",
-            message: "A campanha 'BeautyGlow Skincare' expirou. Considere aplicar para novas oportunidades",
-            time: "5 dias atrás",
-            type: 'warning',
-            unread: false,
-            category: 'campaign'
-        },
-        {
-            id: 5,
-            title: "Manutenção Programada",
-            message: "O sistema estará em manutenção amanhã das 2h às 4h da manhã",
-            time: "1 semana atrás",
-            type: 'info',
-            unread: false,
-            category: 'system'
-        },
-        {
-            id: 6,
-            title: "Aplicação Rejeitada",
-            message: "Sua aplicação para 'Fitness Challenge' não foi selecionada desta vez",
-            time: "1 semana atrás",
-            type: 'error',
-            unread: false,
-            category: 'application'
-        }
-    ]);
+    const dispatch = useAppDispatch();
+    const { user, token } = useAppSelector((state) => state.auth);
+    const notifications = useAppSelector(selectNotifications);
+    const unreadCount = useAppSelector(selectUnreadCount);
+    const isLoading = useAppSelector(selectNotificationLoading);
+    const error = useAppSelector(selectNotificationError);
 
     const [filter, setFilter] = useState<string>('all');
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+    // Fetch notifications on component mount
+    useEffect(() => {
+        if (token) {
+            dispatch(fetchNotifications({ token }));
+        }
+    }, [dispatch, token]);
+
+    // Handle errors
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+        }
+    }, [error]);
 
     const getNotificationIcon = (type: string) => {
         switch (type) {
@@ -124,7 +136,23 @@ const Notification = () => {
         );
     };
 
-    const filteredNotifications = notifications.filter(notification => {
+    // Convert API notifications to display format
+    const displayNotifications: NotificationItem[] = notifications.map(notification => ({
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        time: new Date(notification.created_at).toLocaleString('pt-BR', {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit'
+        }),
+        type: getNotificationType(notification.type),
+        unread: !notification.is_read,
+        category: getNotificationCategory(notification.type)
+    }));
+
+    const filteredNotifications = displayNotifications.filter(notification => {
         const matchesFilter = filter === 'all' || 
             (filter === 'unread' && notification.unread) ||
             (filter === 'read' && !notification.unread);
@@ -134,30 +162,42 @@ const Notification = () => {
         return matchesFilter && matchesCategory;
     });
 
-    const unreadCount = notifications.filter(n => n.unread).length;
-
-    const markAsRead = (id: number) => {
-        setNotifications(prev => 
-            prev.map(notification => 
-                notification.id === id 
-                    ? { ...notification, unread: false }
-                    : notification
-            )
-        );
+    const handleMarkAsRead = async (id: number) => {
+        if (!token) return;
+        
+        try {
+            await dispatch(markNotificationAsRead({ notificationId: id, token })).unwrap();
+            toast.success('Notificação marcada como lida');
+        } catch (error) {
+            toast.error('Erro ao marcar notificação como lida');
+        }
     };
 
-    const markAllAsRead = () => {
-        setNotifications(prev => 
-            prev.map(notification => ({ ...notification, unread: false }))
-        );
+    const handleMarkAllAsRead = async () => {
+        if (!token) return;
+        
+        try {
+            await dispatch(markAllNotificationsAsRead(token)).unwrap();
+            toast.success('Todas as notificações foram marcadas como lidas');
+        } catch (error) {
+            toast.error('Erro ao marcar notificações como lidas');
+        }
     };
 
-    const deleteNotification = (id: number) => {
-        setNotifications(prev => prev.filter(notification => notification.id !== id));
+    const handleDeleteNotification = async (id: number) => {
+        if (!token) return;
+        
+        try {
+            await dispatch(deleteNotification({ notificationId: id, token })).unwrap();
+            toast.success('Notificação excluída');
+        } catch (error) {
+            toast.error('Erro ao excluir notificação');
+        }
     };
 
     const clearAllRead = () => {
-        setNotifications(prev => prev.filter(notification => notification.unread));
+        // This would need a new API endpoint to clear all read notifications
+        toast.info('Funcionalidade em desenvolvimento');
     };
 
     return (
@@ -176,7 +216,7 @@ const Notification = () => {
                         <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={markAllAsRead}
+                            onClick={handleMarkAllAsRead}
                             disabled={unreadCount === 0}
                             className="text-xs"
                         >
@@ -284,7 +324,7 @@ const Notification = () => {
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            onClick={() => markAsRead(notification.id)}
+                                                            onClick={() => handleMarkAsRead(notification.id)}
                                                             className="h-8 w-8 p-0"
                                                         >
                                                             <Check className="w-4 h-4" />
@@ -293,7 +333,7 @@ const Notification = () => {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => deleteNotification(notification.id)}
+                                                        onClick={() => handleDeleteNotification(notification.id)}
                                                         className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
                                                     >
                                                         <Trash2 className="w-4 h-4" />

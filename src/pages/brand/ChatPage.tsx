@@ -67,7 +67,7 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
         stopTyping,
         markMessagesAsRead,
         reconnect,
-    } = useSocket();
+    } = useSocket({ enableNotifications: false, enableChat: true });
 
     // Component mount/unmount tracking
     useEffect(() => {

@@ -30,13 +30,6 @@ AuthAPI.interceptors.request.use(
             delete config.headers['Content-Type'];
         }
         
-        console.log('Request config:', {
-            url: config.url,
-            method: config.method,
-            headers: config.headers,
-            data: config.data
-        });
-        
         return config;
     },
     (error) => {
@@ -171,6 +164,28 @@ export const profileUpdate = async (data: any) => {
     try {
         const isFormData = data instanceof FormData;
         
+        console.log('=== API PROFILE UPDATE DEBUG ===');
+        console.log('Data type:', typeof data);
+        console.log('Is FormData:', isFormData);
+        
+        // If it's FormData, log its contents
+        if (isFormData) {
+            console.log('[API] FormData contents:');
+            for (let [key, value] of data.entries()) {
+                console.log(`${key}:`, value);
+            }
+            
+            // Log headers that will be sent
+            console.log('[API] Request headers:', {
+                "Content-Type": "multipart/form-data (will be set by browser)"
+            });
+        } else {
+            console.log('[API] JSON data:', data);
+            console.log('[API] Request headers:', {
+                "Content-Type": "application/json"
+            });
+        }
+        
         const config = {
             headers: {
                 "Content-Type": isFormData ? "multipart/form-data" : "application/json",
@@ -182,7 +197,11 @@ export const profileUpdate = async (data: any) => {
             delete config.headers["Content-Type"];
         }
         
+        console.log('[API] Final config:', config);
+        
         const response = await AuthAPI.put("/api/profile", data, config);
+        console.log('[API] Response:', response.data);
+        
         if (!response.data.success) {
             throw new Error(response.data.message || 'Failed to update profile');
         }
