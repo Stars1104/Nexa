@@ -1218,74 +1218,157 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
         );
     };
 
+    // const renderMessageContent = (message: Message) => {
+    //     if (message.message_type === 'file') {
+    //         return (
+    //             <div className="space-y-3">
+    //                 <div className="group relative overflow-hidden bg-gradient-to-r from-white to-slate-50 dark:from-slate-800 dark:to-slate-700 rounded-2xl border border-slate-200 dark:border-slate-600 shadow-lg hover:shadow-xl transition-all duration-500 hover:scale-[1.02]">
+    //                     <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+    //                     <div className="relative flex items-center justify-between p-5">
+    //                         <div className="flex items-center gap-4 flex-1">
+    //                             <div className={`w-14 h-14 bg-gradient-to-br ${getFileColor(message.file_name || '', message.message_type)} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+    //                                 {getFileIcon(message.file_name || '', message.message_type)}
+    //                             </div>
+    //                             <div className="flex-1 min-w-0">
+    //                                 <div className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors duration-300">
+    //                                     {message.file_name}
+    //                                 </div>
+    //                                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+    //                                     <span>{message.formatted_file_size || (message.file_size ? formatFileSize(parseInt(message.file_size)) : 'Unknown size')}</span>
+    //                                     <span className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full" />
+    //                                     <span className="capitalize">{getFileExtension(message.file_name || '')} file</span>
+    //                                 </div>
+    //                                 <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+    //                                     <Sparkles className="w-3 h-3" />
+    //                                     <span>Click to view options</span>
+    //                                 </div>
+    //                             </div>
+    //                         </div>
+    //                         <FileDropdown message={message} />
+    //                     </div>
+    //                 </div>
+    //                 {message.message && message.message !== message.file_name && (
+    //                     <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+    //                         {message.message}
+    //                     </p>
+    //                 )}
+    //             </div>
+    //         );
+    //     } else if (message.message_type === 'image') {
+    //         return (
+    //             <div className="space-y-3">
+    //                 {message.file_url && (
+    //                     <div className="relative group overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:scale-[1.02]">
+    //                         <img
+    //                             src={message.file_url}
+    //                             alt={message.file_name || 'Image'}
+    //                             className="max-w-full max-h-80 w-full object-cover cursor-pointer transition-all duration-500 group-hover:brightness-110"
+    //                             onClick={() => setImageViewer({
+    //                                 isOpen: true,
+    //                                 imageUrl: message.file_url || '',
+    //                                 imageName: message.file_name || 'Image',
+    //                                 imageSize: message.file_size ? formatFileSize(parseInt(message.file_size)) : undefined
+    //                             })}
+    //                         />
+    //                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+    //                         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+    //                             <FileDropdown message={message} />
+    //                         </div>
+    //                         <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+    //                             <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm text-white px-3 py-2 rounded-xl text-sm">
+    //                                 <ImageIcon className="w-4 h-4" />
+    //                                 <span>Click to view full size</span>
+    //                             </div>
+    //                         </div>
+    //                     </div>
+    //                 )}
+    //                 {message.message && (
+    //                     <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+    //                         {message.message}
+    //                     </p>
+    //                 )}
+    //             </div>
+    //         );
+    //     }
+        
+    //     return <p className="text-sm text-slate-700 dark:text-slate-300">{message.message}</p>;
+    // };
+
+    
     const renderMessageContent = (message: Message) => {
         if (message.message_type === 'file') {
             return (
                 <div className="space-y-3">
-                    <div className="group relative overflow-hidden bg-gradient-to-r from-white to-slate-50 dark:from-slate-800 dark:to-slate-700 rounded-2xl border border-slate-200 dark:border-slate-600 shadow-lg hover:shadow-xl transition-all duration-500 hover:scale-[1.02]">
-                        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                        <div className="relative flex items-center justify-between p-5">
-                            <div className="flex items-center gap-4 flex-1">
-                                <div className={`w-14 h-14 bg-gradient-to-br ${getFileColor(message.file_name || '', message.message_type)} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                                    {getFileIcon(message.file_name || '', message.message_type)}
+                    <div className="flex items-center justify-between p-3 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 shadow-sm">
+                        <div className="flex items-center gap-3 flex-1">
+                            <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/20 rounded-lg flex items-center justify-center">
+                                <File className="w-5 h-5 text-pink-600 dark:text-pink-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                    {message.file_name}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors duration-300">
-                                        {message.file_name}
-                                    </div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
-                                        <span>{message.formatted_file_size || (message.file_size ? formatFileSize(parseInt(message.file_size)) : 'Unknown size')}</span>
-                                        <span className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full" />
-                                        <span className="capitalize">{getFileExtension(message.file_name || '')} file</span>
-                                    </div>
-                                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
-                                        <Sparkles className="w-3 h-3" />
-                                        <span>Click to view options</span>
-                                    </div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400">
+                                    {message.formatted_file_size || (message.file_size ? formatFileSize(parseInt(message.file_size)) : 'Unknown size')}
+                                </div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                                    {getFileExtension(message.file_name || '')} file
                                 </div>
                             </div>
-                            <FileDropdown message={message} />
                         </div>
+                        <FileDropdown message={message} />
                     </div>
                     {message.message && message.message !== message.file_name && (
-                        <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
-                            {message.message}
-                        </p>
+                        <p className="text-sm text-slate-700 dark:text-slate-300">{message.message}</p>
                     )}
                 </div>
             );
         } else if (message.message_type === 'image') {
+            const handleImageClick = () => {
+                setImageViewer({
+                    isOpen: true,
+                    imageUrl: message.file_url || '',
+                    imageName: message.file_name || 'Image',
+                    imageSize: message.file_size ? formatFileSize(parseInt(message.file_size)) : undefined
+                });
+            };
+
             return (
                 <div className="space-y-3">
                     {message.file_url && (
-                        <div className="relative group overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:scale-[1.02]">
+                        <div className="relative group">
                             <img
                                 src={message.file_url}
                                 alt={message.file_name || 'Image'}
-                                className="max-w-full max-h-80 w-full object-cover cursor-pointer transition-all duration-500 group-hover:brightness-110"
-                                onClick={() => setImageViewer({
-                                    isOpen: true,
-                                    imageUrl: message.file_url || '',
-                                    imageName: message.file_name || 'Image',
-                                    imageSize: message.file_size ? formatFileSize(parseInt(message.file_size)) : undefined
-                                })}
+                                className="max-w-full max-h-80 rounded-xl object-cover cursor-pointer"
+                                onClick={handleImageClick}
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-                                <FileDropdown message={message} />
-                            </div>
-                            <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-                                <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm text-white px-3 py-2 rounded-xl text-sm">
-                                    <ImageIcon className="w-4 h-4" />
-                                    <span>Click to view full size</span>
-                                </div>
+                            <div className="absolute bottom-3 left-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-2">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleImageClick();
+                                    }}
+                                    className="p-2 rounded-lg bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors"
+                                    title="View Full Size"
+                                >
+                                    <Maximize2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        downloadImageToLocal(message.file_url || '', message.file_name || 'image');
+                                    }}
+                                    className="p-2 rounded-lg bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors"
+                                    title="Download"
+                                >
+                                    <Download className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
                     )}
                     {message.message && (
-                        <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
-                            {message.message}
-                        </p>
+                        <p className="text-sm text-slate-700 dark:text-slate-300">{message.message}</p>
                     )}
                 </div>
             );
@@ -1293,7 +1376,7 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
         
         return <p className="text-sm text-slate-700 dark:text-slate-300">{message.message}</p>;
     };
-
+    
     // Get file icon based on type (for use in renderMessageContent)
     const getFileIcon = (fileName: string, messageType: string) => {
         const extension = getFileExtension(fileName);
