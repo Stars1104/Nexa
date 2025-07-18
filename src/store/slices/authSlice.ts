@@ -9,6 +9,9 @@ interface User {
   whatsapp?: string;
   isStudent?: boolean;
   isPremium?: boolean; // Added for testing
+  avatar?: string;
+  avatar_url?: string;
+  bio?: string;
 }
 
 interface AuthState {

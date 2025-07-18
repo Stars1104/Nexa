@@ -6,6 +6,7 @@ import userReducer from './slices/userSlice';
 import campaignReducer from './slices/campaignSlice';
 import brandProfileReducer from './slices/brandProfileSlice';
 import notificationReducer from './slices/notificationSlice';
+import portfolioReducer from './slices/portfolioSlice';
 import { rootPersistConfig } from './persistConfig';
 
 const rootReducer = combineReducers({
@@ -14,6 +15,7 @@ const rootReducer = combineReducers({
   campaign: campaignReducer,
   brandProfile: brandProfileReducer,
   notification: notificationReducer,
+  portfolio: portfolioReducer,
 });
 
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);

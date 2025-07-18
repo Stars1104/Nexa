@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { ScrollArea } from "./ui/scroll-area";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -17,9 +18,13 @@ import {
     Check,
     Clock,
     Download,
-    ExternalLink,
     MoreVertical,
-    Eye
+    Eye,
+    ZoomIn,
+    ZoomOut,
+    RotateCw,
+    Maximize2,
+    Minimize2
 } from "lucide-react";
 import { useSocket } from "../hooks/useSocket";
 import { chatService, ChatRoom, Message } from "../services/chatService";
@@ -41,11 +46,27 @@ export default function Chat() {
     const [searchQuery, setSearchQuery] = useState("");
     const [openDropdowns, setOpenDropdowns] = useState<Set<number>>(new Set());
     
+    // Image viewer state
+    const [imageViewer, setImageViewer] = useState<{
+        isOpen: boolean;
+        imageUrl: string;
+        imageName: string;
+        imageSize?: string;
+    }>({
+        isOpen: false,
+        imageUrl: '',
+        imageName: '',
+        imageSize: ''
+    });
+    const [imageZoom, setImageZoom] = useState(1);
+    const [imageRotation, setImageRotation] = useState(0);
+    
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isMountedRef = useRef(true);
+    const imageViewerRef = useRef<HTMLDivElement>(null);
 
     // Socket.IO hook
     const {
@@ -537,14 +558,268 @@ export default function Chat() {
         };
     }, [selectedRoom, isCurrentUserTyping, stopTyping]);
 
+    // Image Viewer Component
+    const ImageViewer = () => {
+        const handleClose = () => {
+            setImageViewer({ isOpen: false, imageUrl: '', imageName: '', imageSize: '' });
+            setImageZoom(1);
+            setImageRotation(0);
+        };
+
+        const handleZoomIn = () => {
+            setImageZoom(prev => Math.min(prev + 0.25, 3));
+        };
+
+        const handleZoomOut = () => {
+            setImageZoom(prev => Math.max(prev - 0.25, 0.25));
+        };
+
+        const handleRotate = () => {
+            setImageRotation(prev => (prev + 90) % 360);
+        };
+
+        const handleReset = () => {
+            setImageZoom(1);
+            setImageRotation(0);
+        };
+
+        const handleDownload = async () => {
+            try {
+                await downloadImageToLocal(imageViewer.imageUrl, imageViewer.imageName);
+            } catch (error) {
+                console.error('Error downloading image:', error);
+                alert('Failed to download image. Please try again.');
+            }
+        };
+
+        // Close on escape key
+        useEffect(() => {
+            const handleEscape = (e: KeyboardEvent) => {
+                if (e.key === 'Escape') {
+                    handleClose();
+                }
+            };
+
+            const handleKeyDown = (e: KeyboardEvent) => {
+                switch (e.key) {
+                    case 'Escape':
+                        handleClose();
+                        break;
+                    case '+':
+                    case '=':
+                        e.preventDefault();
+                        handleZoomIn();
+                        break;
+                    case '-':
+                        e.preventDefault();
+                        handleZoomOut();
+                        break;
+                    case 'r':
+                        e.preventDefault();
+                        handleRotate();
+                        break;
+                    case '0':
+                        e.preventDefault();
+                        handleReset();
+                        break;
+                    case 'd':
+                        e.preventDefault();
+                        handleDownload();
+                        break;
+                }
+            };
+
+            if (imageViewer.isOpen) {
+                document.addEventListener('keydown', handleEscape);
+                document.addEventListener('keydown', handleKeyDown);
+                document.body.style.overflow = 'hidden';
+            }
+
+            return () => {
+                document.removeEventListener('keydown', handleEscape);
+                document.removeEventListener('keydown', handleKeyDown);
+                document.body.style.overflow = 'unset';
+            };
+        }, [imageViewer.isOpen]);
+
+        if (!imageViewer.isOpen) return null;
+
+        return createPortal(
+            <div 
+                ref={imageViewerRef}
+                className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm flex items-center justify-center"
+                onClick={handleClose}
+            >
+                {/* Image Container */}
+                <div 
+                    className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <img
+                        src={imageViewer.imageUrl}
+                        alt={imageViewer.imageName}
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                        style={{
+                            transform: `scale(${imageZoom}) rotate(${imageRotation}deg)`,
+                            transition: 'transform 0.3s ease-in-out'
+                        }}
+                        draggable={false}
+                    />
+                </div>
+
+                {/* Controls */}
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-xl p-2 border border-white/20">
+                    <button
+                        onClick={handleZoomOut}
+                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                        title="Zoom Out"
+                    >
+                        <ZoomOut className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={handleZoomIn}
+                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                        title="Zoom In"
+                    >
+                        <ZoomIn className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={handleRotate}
+                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                        title="Rotate"
+                    >
+                        <RotateCw className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={handleReset}
+                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                        title="Reset"
+                    >
+                        <Minimize2 className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={handleDownload}
+                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                        title="Download"
+                    >
+                        <Download className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={handleClose}
+                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                        title="Close"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Image Info */}
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 backdrop-blur-sm rounded-xl p-3 border border-white/20">
+                    <div className="text-white text-center">
+                        <div className="font-medium">{imageViewer.imageName}</div>
+                        {imageViewer.imageSize && (
+                            <div className="text-sm text-white/70">{imageViewer.imageSize}</div>
+                        )}
+                        <div className="text-sm text-white/70">
+                            Zoom: {Math.round(imageZoom * 100)}% | Rotation: {imageRotation}°
+                        </div>
+                        <div className="text-xs text-white/50 mt-1">
+                            Press + / - to zoom, R to rotate, 0 to reset, D to download, ESC to close
+                        </div>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        );
+    };
+
+    // Enhanced image download function
+    const downloadImageToLocal = async (imageUrl: string, fileName: string): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    if (!ctx) {
+                        reject(new Error('Could not get canvas context'));
+                        return;
+                    }
+                    
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const mimeType = getMimeType(fileName);
+                    
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            const url = window.URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = fileName;
+                            link.style.display = 'none';
+                            link.setAttribute('download', fileName);
+                            link.setAttribute('type', 'application/octet-stream');
+                            
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            
+                            setTimeout(() => {
+                                window.URL.revokeObjectURL(url);
+                            }, 1000);
+                            
+                            console.log(`Image "${fileName}" downloaded successfully`);
+                            resolve();
+                        } else {
+                            reject(new Error('Failed to create blob from canvas'));
+                        }
+                    }, mimeType, 0.9);
+                    
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            img.onerror = () => {
+                reject(new Error('Failed to load image for download'));
+            };
+            
+            img.src = imageUrl;
+        });
+    };
+
     // File Dropdown Component
     const FileDropdown = ({ message }: { message: Message }) => {
         const dropdownRef = useRef<HTMLDivElement>(null);
         const isOpen = openDropdowns.has(message.id);
         const [isDownloading, setIsDownloading] = useState(false);
+        const [downloadProgress, setDownloadProgress] = useState<number>(0);
+        const [dropdownPosition, setDropdownPosition] = useState<'top' | 'bottom'>('bottom');
 
         const toggleDropdown = (e: React.MouseEvent) => {
             e.stopPropagation();
+            
+            // Check available space and determine dropdown position
+            const buttonRect = e.currentTarget.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const dropdownHeight = 150; // Increased height estimate
+            
+            // If there's not enough space below, show above
+            const spaceBelow = viewportHeight - buttonRect.bottom;
+            const spaceAbove = buttonRect.top;
+            
+            // More aggressive positioning - prefer top if there's any doubt
+            if (spaceBelow < dropdownHeight + 20 || spaceAbove > spaceBelow) {
+                setDropdownPosition('top');
+            } else {
+                setDropdownPosition('bottom');
+            }
+            
             setOpenDropdowns(prev => {
                 const newSet = new Set(prev);
                 if (newSet.has(message.id)) {
@@ -558,7 +833,18 @@ export default function Chat() {
 
         const handleOpen = () => {
             if (message.file_url) {
-                window.open(message.file_url, '_blank');
+                if (message.message_type === 'image') {
+                    // Use image viewer for images
+                    setImageViewer({
+                        isOpen: true,
+                        imageUrl: message.file_url,
+                        imageName: message.file_name || 'Image',
+                        imageSize: message.file_size ? formatFileSize(parseInt(message.file_size)) : undefined
+                    });
+                } else {
+                    // Open in new tab for other file types
+                    window.open(message.file_url, '_blank');
+                }
             }
             setOpenDropdowns(prev => {
                 const newSet = new Set(prev);
@@ -570,104 +856,210 @@ export default function Chat() {
         const handleDownload = async () => {
             if (message.file_url && !isDownloading) {
                 setIsDownloading(true);
+                setDownloadProgress(0);
                 try {
-                    
-                    // Always try fetch first for better control
-                    const response = await fetch(message.file_url, {
-                        method: 'GET',
-                        mode: 'cors',
-                        credentials: 'same-origin'
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                    if (message.message_type === 'image') {
+                        // Use enhanced image download for images
+                        await downloadImageToLocal(message.file_url, message.file_name || 'image');
+                    } else {
+                        // Use regular download for other files
+                        await downloadFileToLocal(message);
                     }
                     
-                    const blob = await response.blob();
-                    
-                    // Create a blob URL
-                    const blobUrl = window.URL.createObjectURL(blob);
-                    
-                    // Create a temporary link element
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    link.download = message.file_name || 'download';
-                    link.style.display = 'none';
-                    
-                    // Append to body, click, and remove
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    // Clean up the blob URL
-                    window.URL.revokeObjectURL(blobUrl);
+                    // Show a brief success indicator
+                    setTimeout(() => {
+                        console.log(`Download completed for: ${message.file_name}`);
+                    }, 500);
                     
                 } catch (error) {
                     console.error('Error downloading file:', error);
-                    
-                    // Try fallback method for images
-                    if (message.message_type === 'image') {
-                        try {   
-                            // For images, try to create a canvas and download
-                            const img = new Image();
-                            img.crossOrigin = 'anonymous';
-                            
-                            img.onload = () => {
-                                const canvas = document.createElement('canvas');
-                                const ctx = canvas.getContext('2d');
-                                canvas.width = img.width;
-                                canvas.height = img.height;
-                                ctx?.drawImage(img, 0, 0);
-                                
-                                canvas.toBlob((blob) => {
-                                    if (blob) {
-                                        const url = window.URL.createObjectURL(blob);
-                                        const link = document.createElement('a');
-                                        link.href = url;
-                                        link.download = message.file_name || 'image.jpg';
-                                        link.style.display = 'none';
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                        window.URL.revokeObjectURL(url);
-                                    }
-                                }, 'image/jpeg', 0.9);
-                            };
-                            
-                            img.onerror = () => {
-                                console.error('Image load failed for canvas fallback');
-                                alert('Unable to download image. Please try opening it in a new tab and saving manually.');
-                            };
-                            
-                            img.src = message.file_url;
-                        } catch (canvasError) {
-                            console.error('Canvas fallback failed:', canvasError);
-                            alert('Unable to download file. Please try opening it in a new tab and saving manually.');
-                        }
-                    } else {
-                        // For other files, try direct download
-                        try {
-                            const link = document.createElement('a');
-                            link.href = message.file_url;
-                            link.download = message.file_name || 'download';
-                            link.target = '_blank';
-                            link.style.display = 'none';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        } catch (fallbackError) {
-                            console.error('Fallback download failed:', fallbackError);
-                            alert('Unable to download file. Please try opening it in a new tab and saving manually.');
-                        }
-                    }
+                    // Show user-friendly error message
+                    alert(`Unable to download "${message.file_name}". Please try opening it in a new tab and saving manually.`);
                 } finally {
                     setIsDownloading(false);
+                    setDownloadProgress(0);
                 }
             }
             setOpenDropdowns(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(message.id);
                 return newSet;
+            });
+        };
+
+        // Enhanced file download function with multiple fallback methods
+        const downloadFileToLocal = async (message: Message): Promise<void> => {
+            const fileName = message.file_name || 'download';
+            const fileSize = message.file_size ? parseInt(message.file_size) : 0;
+            
+            // Show download progress for large files
+            if (fileSize > 1024 * 1024) { // Files larger than 1MB
+                console.log(`Starting download of ${fileName} (${formatFileSize(fileSize)})`);
+            }
+            
+            // Method 1: Try fetch with proper headers for better compatibility
+            try {
+                const response = await fetch(message.file_url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': '*/*',
+                        'Cache-Control': 'no-cache',
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const blob = await response.blob();
+                
+                // Validate blob size if we have file size info
+                if (fileSize > 0 && blob.size !== fileSize) {
+                    console.warn(`File size mismatch: expected ${fileSize}, got ${blob.size}`);
+                }
+                
+                // Create a blob URL with proper MIME type
+                const mimeType = getMimeType(fileName);
+                const blobUrl = window.URL.createObjectURL(new Blob([blob], { type: mimeType }));
+                
+                // Method 1a: Modern browser download API
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = fileName;
+                link.style.display = 'none';
+                link.setAttribute('download', fileName);
+                link.setAttribute('type', 'application/octet-stream');
+                
+                // Trigger download
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Clean up the blob URL after a short delay
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(blobUrl);
+                }, 1000);
+                
+                console.log(`File "${fileName}" (${formatFileSize(blob.size)}) downloaded successfully`);
+                return;
+                
+            } catch (fetchError) {
+                console.warn('Fetch method failed, trying fallback methods:', fetchError);
+                
+                // Method 2: For images, try canvas method
+                if (message.message_type === 'image') {
+                    try {
+                        await downloadImageViaCanvas(message.file_url, fileName);
+                        return;
+                    } catch (canvasError) {
+                        console.warn('Canvas method failed:', canvasError);
+                    }
+                }
+                
+                // Method 3: Direct link method with proper attributes
+                try {
+                    const link = document.createElement('a');
+                    link.href = message.file_url;
+                    link.download = fileName;
+                    link.style.display = 'none';
+                    link.setAttribute('download', fileName);
+                    link.setAttribute('type', 'application/octet-stream');
+                    link.setAttribute('target', '_blank');
+                    
+                    // Add timestamp to prevent caching issues
+                    const url = new URL(message.file_url);
+                    url.searchParams.set('download', Date.now().toString());
+                    url.searchParams.set('filename', fileName);
+                    
+                    link.href = url.toString();
+                    
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    console.log(`File "${fileName}" download initiated via direct link`);
+                    return;
+                    
+                } catch (directError) {
+                    console.warn('Direct link method failed:', directError);
+                }
+                
+                // Method 4: Open in new tab as last resort
+                try {
+                    window.open(message.file_url, '_blank', 'noopener,noreferrer');
+                    console.log(`File "${fileName}" opened in new tab for manual download`);
+                    return;
+                } catch (openError) {
+                    console.warn('Open in new tab failed:', openError);
+                }
+                
+                // If all methods fail, throw error
+                throw new Error('All download methods failed');
+            }
+        };
+
+        // Helper function for downloading images via canvas
+        const downloadImageViaCanvas = (imageUrl: string, fileName: string): Promise<void> => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        if (!ctx) {
+                            reject(new Error('Could not get canvas context'));
+                            return;
+                        }
+                        
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Use utility function to get proper MIME type
+                        const mimeType = getMimeType(fileName);
+                        
+                        canvas.toBlob((blob) => {
+                            if (blob) {
+                                const url = window.URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = fileName;
+                                link.style.display = 'none';
+                                link.setAttribute('download', fileName);
+                                link.setAttribute('type', 'application/octet-stream');
+                                link.setAttribute('data-downloadurl', `${mimeType}:${fileName}:${url}`);
+                                
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                
+                                // Clean up the blob URL after a short delay
+                                setTimeout(() => {
+                                    window.URL.revokeObjectURL(url);
+                                }, 1000);
+                                
+                                console.log(`Image "${fileName}" (${formatFileSize(blob.size)}) downloaded via canvas`);
+                                resolve();
+                            } else {
+                                reject(new Error('Failed to create blob from canvas'));
+                            }
+                        }, mimeType, 0.9);
+                        
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                img.onerror = () => {
+                    reject(new Error('Failed to load image for canvas download'));
+                };
+                
+                img.src = imageUrl;
             });
         };
 
@@ -702,28 +1094,84 @@ export default function Chat() {
                     <MoreVertical className="w-4 h-4 text-slate-500" />
                 </button>
                 
-                {isOpen && (
-                    <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
-                        <button
-                            onClick={handleOpen}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                        >
-                            <Eye className="w-4 h-4" />
-                            Open
-                        </button>
-                        <button
-                            onClick={handleDownload}
-                            disabled={isDownloading}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isDownloading ? (
-                                <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                                <Download className="w-4 h-4" />
-                            )}
-                            {isDownloading ? 'Downloading...' : 'Download'}
-                        </button>
-                    </div>
+                {isOpen && createPortal(
+                    <div 
+                        className="fixed w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[9999] backdrop-blur-sm"
+                        style={{
+                            left: dropdownRef.current ? Math.max(10, dropdownRef.current.getBoundingClientRect().right - 224) : 0,
+                            top: dropdownRef.current ? Math.max(10, dropdownRef.current.getBoundingClientRect().top - 180) : 0,
+                            maxHeight: '240px',
+                            overflow: 'visible'
+                        }}
+                    >
+                        {/* File Info Header */}
+                        <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-t-xl">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/20 rounded-lg flex items-center justify-center">
+                                    {message.message_type === 'image' ? (
+                                        <img 
+                                            src={message.file_url} 
+                                            alt="Preview" 
+                                            className="w-5 h-5 rounded object-cover"
+                                        />
+                                    ) : (
+                                        <File className="w-5 h-5 text-pink-600 dark:text-pink-400" />
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                        {message.file_name}
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                                        {message.formatted_file_size || (message.file_size ? formatFileSize(parseInt(message.file_size)) : 'Unknown size')}
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                                        {message.message_type === 'image' ? 'Image' : `${getFileExtension(message.file_name || '')} file`}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="p-2 space-y-1">
+                            <button
+                                onClick={handleOpen}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg transition-all duration-200 hover:shadow-sm"
+                            >
+                                {message.message_type === 'image' ? (
+                                    <Maximize2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                ) : (
+                                    <Eye className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                )}
+                                <span className="font-medium">
+                                    {message.message_type === 'image' ? 'View Image' : 'Open File'}
+                                </span>
+                            </button>
+                            <button
+                                onClick={handleDownload}
+                                disabled={isDownloading}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg transition-all duration-200 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
+                            >
+                                {isDownloading ? (
+                                    <div className="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                    <Download className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                )}
+                                <span className="font-medium">
+                                    {isDownloading ? (
+                                        downloadProgress > 0 ? `Downloading ${downloadProgress}%` : 'Downloading...'
+                                    ) : (
+                                        message.message_type === 'image' ? 'Download Image' : 'Download File'
+                                    )}
+                                </span>
+                                {isDownloading && downloadProgress > 0 && (
+                                    <div className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-pink-500 to-purple-600 transition-all duration-300 rounded-b-lg" 
+                                         style={{ width: `${downloadProgress}%` }} />
+                                )}
+                            </button>
+                        </div>
+                    </div>,
+                    document.body
                 )}
             </div>
         );
@@ -732,50 +1180,83 @@ export default function Chat() {
     const renderMessageContent = (message: Message) => {
         if (message.message_type === 'file') {
             return (
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                        <div className="flex items-center gap-2 flex-1">
-                            <File className="w-4 h-4 text-slate-500" />
-                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
-                                {message.file_name}
-                            </span>
-                            {message.formatted_file_size && (
-                                <span className="text-xs text-slate-500">
-                                    ({message.formatted_file_size})
-                                </span>
-                            )}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-xl border border-slate-200 dark:border-slate-600 shadow-sm">
+                        <div className="flex items-center gap-3 flex-1">
+                            <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/20 rounded-lg flex items-center justify-center">
+                                <File className="w-5 h-5 text-pink-600 dark:text-pink-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                    {message.file_name}
+                                </div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400">
+                                    {message.formatted_file_size || (message.file_size ? formatFileSize(parseInt(message.file_size)) : 'Unknown size')}
+                                </div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                                    {getFileExtension(message.file_name || '')} file
+                                </div>
+                            </div>
                         </div>
                         <FileDropdown message={message} />
                     </div>
                     {message.message && message.message !== message.file_name && (
-                        <p className="text-sm">{message.message}</p>
+                        <p className="text-sm text-slate-700 dark:text-slate-300">{message.message}</p>
                     )}
                 </div>
             );
         } else if (message.message_type === 'image') {
+            const handleImageClick = () => {
+                setImageViewer({
+                    isOpen: true,
+                    imageUrl: message.file_url || '',
+                    imageName: message.file_name || 'Image',
+                    imageSize: message.file_size ? formatFileSize(parseInt(message.file_size)) : undefined
+                });
+            };
+
             return (
-                <div className="space-y-2">
+                <div className="space-y-3">
                     {message.file_url && (
                         <div className="relative group">
                             <img
                                 src={message.file_url}
                                 alt={message.file_name || 'Image'}
-                                className="max-w-full max-h-64 rounded-lg object-cover cursor-pointer"
-                                onClick={() => window.open(message.file_url, '_blank')}
+                                className="max-w-full max-h-80 rounded-xl object-cover cursor-pointer"
+                                onClick={handleImageClick}
                             />
-                            <div className="absolute top-2 right-2">
-                                <FileDropdown message={message} />
+                            <div className="absolute bottom-3 left-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-2">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleImageClick();
+                                    }}
+                                    className="p-2 rounded-lg bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors"
+                                    title="View Full Size"
+                                >
+                                    <Maximize2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        downloadImageToLocal(message.file_url || '', message.file_name || 'image');
+                                    }}
+                                    className="p-2 rounded-lg bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors"
+                                    title="Download"
+                                >
+                                    <Download className="w-4 h-4" />
+                                </button>
                             </div>
                         </div>
                     )}
                     {message.message && (
-                        <p className="text-sm">{message.message}</p>
+                        <p className="text-sm text-slate-700 dark:text-slate-300">{message.message}</p>
                     )}
                 </div>
             );
         }
         
-        return <p className="text-sm">{message.message}</p>;
+        return <p className="text-sm text-slate-700 dark:text-slate-300">{message.message}</p>;
     };
 
     const formatMessageTime = (dateString: string) => {
@@ -787,6 +1268,45 @@ export default function Chat() {
         } else {
             return format(date, 'MMM d');
         }
+    };
+
+    // Utility function to format file sizes
+    const formatFileSize = (bytes: number): string => {
+        if (bytes === 0) return '0 Bytes';
+        
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    // Utility function to get file extension from filename
+    const getFileExtension = (filename: string): string => {
+        return filename.split('.').pop()?.toLowerCase() || '';
+    };
+
+    // Utility function to get appropriate MIME type based on file extension
+    const getMimeType = (filename: string): string => {
+        const extension = getFileExtension(filename);
+        const mimeTypes: { [key: string]: string } = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'webp': 'image/webp',
+            'pdf': 'application/pdf',
+            'doc': 'application/msword',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'txt': 'text/plain',
+            'zip': 'application/zip',
+            'rar': 'application/x-rar-compressed',
+            'mp4': 'video/mp4',
+            'mp3': 'audio/mpeg',
+            'wav': 'audio/wav',
+        };
+        
+        return mimeTypes[extension] || 'application/octet-stream';
     };
 
     const filteredRooms = chatRooms.filter(room =>
@@ -1047,22 +1567,29 @@ export default function Chat() {
 
                                 {/* File preview */}
                                 {selectedFile && (
-                                    <div className="flex items-center gap-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                                    <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-xl border border-pink-200 dark:border-pink-800 shadow-sm">
                                         {filePreview ? (
-                                            <img src={filePreview} alt="Preview" className="w-8 h-8 rounded object-cover" />
+                                            <img src={filePreview} alt="Preview" className="w-10 h-10 rounded-lg object-cover border border-pink-200 dark:border-pink-700" />
                                         ) : (
-                                            <File className="w-8 h-8 text-slate-500" />
+                                            <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center border border-pink-200 dark:border-pink-700">
+                                                <File className="w-5 h-5 text-pink-600 dark:text-pink-400" />
+                                            </div>
                                         )}
-                                        <span className="text-sm text-slate-600 dark:text-slate-300">
-                                            {selectedFile.name}
-                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                                                {selectedFile.name}
+                                            </div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                                {formatFileSize(selectedFile.size)}
+                                            </div>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 setSelectedFile(null);
                                                 setFilePreview(null);
                                             }}
-                                            className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                            className="p-1.5 rounded-lg hover:bg-pink-100 dark:hover:bg-pink-900/30 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                                         >
                                             <X className="w-4 h-4" />
                                         </button>
@@ -1137,6 +1664,9 @@ export default function Chat() {
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
+
+            {/* Image Viewer */}
+            <ImageViewer />
         </div>
     );
 }

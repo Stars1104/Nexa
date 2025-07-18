@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
@@ -23,7 +24,27 @@ import {
     Download,
     ExternalLink,
     MoreVertical,
-    Eye
+    Eye,
+    FileText,
+    ImageIcon,
+    FileVideo,
+    FileAudio,
+    Archive,
+    Code,
+    Sparkles,
+    Zap,
+    Star,
+    Heart,
+    Share2,
+    Copy,
+    Play,
+    Pause,
+    Volume2,
+    Maximize2,
+    RotateCcw,
+    ZoomIn,
+    ZoomOut,
+    Minimize2
 } from "lucide-react";
 import { useSocket } from "../../hooks/useSocket";
 import { chatService, ChatRoom, Message } from "../../services/chatService";
@@ -47,13 +68,29 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [filePreview, setFilePreview] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
-    const [openDropdowns, setOpenDropdowns] = useState<{ [key: string]: boolean }>({});
+    const [openDropdowns, setOpenDropdowns] = useState<Set<number>>(new Set());
+    
+    // Image viewer state
+    const [imageViewer, setImageViewer] = useState<{
+        isOpen: boolean;
+        imageUrl: string;
+        imageName: string;
+        imageSize?: string;
+    }>({
+        isOpen: false,
+        imageUrl: '',
+        imageName: '',
+        imageSize: ''
+    });
+    const [imageZoom, setImageZoom] = useState(1);
+    const [imageRotation, setImageRotation] = useState(0);
     
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isMountedRef = useRef(true);
+    const imageViewerRef = useRef<HTMLDivElement>(null);
 
     // Socket.IO hook
     const {
@@ -273,12 +310,58 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
             }
         };
 
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && imageViewer.isOpen) {
+                setImageViewer({ isOpen: false, imageUrl: '', imageName: '', imageSize: '' });
+                setImageZoom(1);
+                setImageRotation(0);
+            }
+        };
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!imageViewer.isOpen) return;
+            
+            switch (event.key) {
+                case 'Escape':
+                    setImageViewer({ isOpen: false, imageUrl: '', imageName: '', imageSize: '' });
+                    setImageZoom(1);
+                    setImageRotation(0);
+                    break;
+                case '+':
+                case '=':
+                    event.preventDefault();
+                    setImageZoom(prev => Math.min(prev + 0.25, 3));
+                    break;
+                case '-':
+                    event.preventDefault();
+                    setImageZoom(prev => Math.max(prev - 0.25, 0.25));
+                    break;
+                case 'r':
+                    event.preventDefault();
+                    setImageRotation(prev => (prev + 90) % 360);
+                    break;
+                case '0':
+                    event.preventDefault();
+                    setImageZoom(1);
+                    setImageRotation(0);
+                    break;
+                case 'd':
+                    event.preventDefault();
+                    downloadImageToLocal(imageViewer.imageUrl, imageViewer.imageName);
+                    break;
+            }
+        };
+
         window.addEventListener('beforeunload', handleBeforeUnload);
         document.addEventListener('visibilitychange', handleVisibilityChange);
+        document.addEventListener('keydown', handleEscape);
+        document.addEventListener('keydown', handleKeyDown);
 
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+            document.removeEventListener('keydown', handleEscape);
+            document.removeEventListener('keydown', handleKeyDown);
             
             // Cleanup typing indicators on unmount
             if (selectedRoom && isCurrentUserTyping) {
@@ -290,7 +373,7 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                 stopTyping(selectedRoom.room_id);
             }
         };
-    }, [selectedRoom, isCurrentUserTyping, stopTyping]);
+    }, [selectedRoom, isCurrentUserTyping, stopTyping, imageViewer.isOpen]);
 
     const loadChatRooms = async () => {
         if (!isMountedRef.current) return;
@@ -488,6 +571,45 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
         setComponent?.("Minhas campanhas");
     };
 
+    // Utility function to format file sizes
+    const formatFileSize = (bytes: number): string => {
+        if (bytes === 0) return '0 Bytes';
+        
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    // Utility function to get file extension from filename
+    const getFileExtension = (filename: string): string => {
+        return filename.split('.').pop()?.toLowerCase() || '';
+    };
+
+    // Utility function to get appropriate MIME type based on file extension
+    const getMimeType = (filename: string): string => {
+        const extension = getFileExtension(filename);
+        const mimeTypes: { [key: string]: string } = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'webp': 'image/webp',
+            'pdf': 'application/pdf',
+            'doc': 'application/msword',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'txt': 'text/plain',
+            'zip': 'application/zip',
+            'rar': 'application/x-rar-compressed',
+            'mp4': 'video/mp4',
+            'mp3': 'audio/mpeg',
+            'wav': 'audio/wav',
+        };
+        
+        return mimeTypes[extension] || 'application/octet-stream';
+    };
+
     const filteredRooms = chatRooms.filter(room =>
         room.other_user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         room.campaign_title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -504,130 +626,463 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
         }
     };
 
-    // File Dropdown Component
+    // Enhanced image download function
+    const downloadImageToLocal = async (imageUrl: string, fileName: string): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    if (!ctx) {
+                        reject(new Error('Could not get canvas context'));
+                        return;
+                    }
+                    
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const mimeType = getMimeType(fileName);
+                    
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            const url = window.URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = fileName;
+                            link.style.display = 'none';
+                            link.setAttribute('download', fileName);
+                            link.setAttribute('type', 'application/octet-stream');
+                            
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            
+                            setTimeout(() => {
+                                window.URL.revokeObjectURL(url);
+                            }, 1000);
+                            
+                            console.log(`Image "${fileName}" downloaded successfully`);
+                            resolve();
+                        } else {
+                            reject(new Error('Failed to create blob from canvas'));
+                        }
+                    }, mimeType, 0.9);
+                    
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            img.onerror = () => {
+                reject(new Error('Failed to load image for download'));
+            };
+            
+            img.src = imageUrl;
+        });
+    };
+
+    // File Dropdown Component - Enhanced with beautiful design
     const FileDropdown = ({ message }: { message: Message }) => {
         const dropdownRef = useRef<HTMLDivElement>(null);
+        const buttonRef = useRef<HTMLButtonElement>(null);
         const isOpen = openDropdowns[message.id];
         const [isDownloading, setIsDownloading] = useState(false);
+        const [downloadProgress, setDownloadProgress] = useState<number>(0);
 
         const toggleDropdown = (e: React.MouseEvent) => {
             e.stopPropagation();
-            setOpenDropdowns(prev => ({
-                ...prev,
-                [message.id]: !prev[message.id]
-            }));
+            e.preventDefault();
+            
+            setOpenDropdowns(prev => {
+                const newState = {
+                    ...prev,
+                    [message.id]: !prev[message.id]
+                };
+                return newState;
+            });
         };
 
         const handleOpen = () => {
             if (message.file_url) {
-                window.open(message.file_url, '_blank');
+                if (message.message_type === 'image') {
+                    // Use image viewer for images
+                    setImageViewer({
+                        isOpen: true,
+                        imageUrl: message.file_url,
+                        imageName: message.file_name || 'Image',
+                        imageSize: message.file_size ? formatFileSize(parseInt(message.file_size)) : undefined
+                    });
+                } else {
+                    // Open in new tab for other file types
+                    window.open(message.file_url, '_blank');
+                }
             }
-            setOpenDropdowns(prev => ({
-                ...prev,
-                [message.id]: false
-            }));
+            setOpenDropdowns(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(message.id);
+                return newSet;
+            });
         };
 
         const handleDownload = async () => {
             if (message.file_url && !isDownloading) {
                 setIsDownloading(true);
+                setDownloadProgress(0);
                 try {
-                    // Always try fetch first for better control
-                    const response = await fetch(message.file_url, {
-                        method: 'GET',
-                        mode: 'cors',
-                        credentials: 'same-origin'
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                    if (message.message_type === 'image') {
+                        // Use enhanced image download for images
+                        await downloadImageToLocal(message.file_url, message.file_name || 'image');
+                    } else {
+                        // Use regular download for other files
+                        await downloadFileToLocal(message);
                     }
                     
-                    const blob = await response.blob();
-                    
-                    // Create a blob URL
-                    const blobUrl = window.URL.createObjectURL(blob);
-                    
-                    // Create a temporary link element
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    link.download = message.file_name || 'download';
-                    link.style.display = 'none';
-                    
-                    // Append to body, click, and remove
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    // Clean up the blob URL
-                    window.URL.revokeObjectURL(blobUrl);
+                    // Show a brief success indicator
+                    setTimeout(() => {
+                        console.log(`Download completed for: ${message.file_name}`);
+                    }, 500);
                     
                 } catch (error) {
                     console.error('Error downloading file:', error);
-                    
-                    // Try fallback method for images
-                    if (message.message_type === 'image') {
-                        try {
-                            // For images, try to create a canvas and download
-                            const img = new Image();
-                            img.crossOrigin = 'anonymous';
-                            
-                            img.onload = () => {
-                                const canvas = document.createElement('canvas');
-                                const ctx = canvas.getContext('2d');
-                                canvas.width = img.width;
-                                canvas.height = img.height;
-                                ctx?.drawImage(img, 0, 0);
-                                
-                                canvas.toBlob((blob) => {
-                                    if (blob) {
-                                        const url = window.URL.createObjectURL(blob);
-                                        const link = document.createElement('a');
-                                        link.href = url;
-                                        link.download = message.file_name || 'image.jpg';
-                                        link.style.display = 'none';
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                        window.URL.revokeObjectURL(url);
-                                    }
-                                }, 'image/jpeg', 0.9);
-                            };
-                            
-                            img.onerror = () => {
-                                console.error('Image load failed for canvas fallback');
-                                alert('Unable to download image. Please try opening it in a new tab and saving manually.');
-                            };
-                            
-                            img.src = message.file_url;
-                        } catch (canvasError) {
-                            console.error('Canvas fallback failed:', canvasError);
-                            alert('Unable to download file. Please try opening it in a new tab and saving manually.');
-                        }
-                    } else {
-                        // For other files, try direct download
-                        try {
-                            const link = document.createElement('a');
-                            link.href = message.file_url;
-                            link.download = message.file_name || 'download';
-                            link.target = '_blank';
-                            link.style.display = 'none';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        } catch (fallbackError) {
-                            console.error('Fallback download failed:', fallbackError);
-                            alert('Unable to download file. Please try opening it in a new tab and saving manually.');
-                        }
-                    }
+                    // Show user-friendly error message
+                    alert(`Unable to download "${message.file_name}". Please try opening it in a new tab and saving manually.`);
                 } finally {
                     setIsDownloading(false);
+                    setDownloadProgress(0);
                 }
             }
             setOpenDropdowns(prev => ({
                 ...prev,
                 [message.id]: false
             }));
+        };
+
+        const handleCopyLink = () => {
+            if (message.file_url) {
+                navigator.clipboard.writeText(message.file_url);
+                // Show a brief success indicator
+                setTimeout(() => {
+                    console.log('Link copied to clipboard');
+                }, 500);
+            }
+            setOpenDropdowns(prev => ({
+                ...prev,
+                [message.id]: false
+            }));
+        };
+
+        const handleShare = () => {
+            if (navigator.share && message.file_url) {
+                navigator.share({
+                    title: message.file_name,
+                    url: message.file_url,
+                });
+            } else {
+                handleCopyLink();
+            }
+            setOpenDropdowns(prev => ({
+                ...prev,
+                [message.id]: false
+            }));
+        };
+
+        // Enhanced file download function with multiple fallback methods
+        const downloadFileToLocal = async (message: Message): Promise<void> => {
+            const fileName = message.file_name || 'download';
+            const fileSize = message.file_size ? parseInt(message.file_size) : 0;
+            
+            // Show download progress for large files
+            if (fileSize > 1024 * 1024) { // Files larger than 1MB
+                console.log(`Starting download of ${fileName} (${formatFileSize(fileSize)})`);
+            }
+            
+            // Method 1: Try fetch with proper headers for better compatibility
+            try {
+                const response = await fetch(message.file_url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': '*/*',
+                        'Cache-Control': 'no-cache',
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const blob = await response.blob();
+                
+                // Validate blob size if we have file size info
+                if (fileSize > 0 && blob.size !== fileSize) {
+                    console.warn(`File size mismatch: expected ${fileSize}, got ${blob.size}`);
+                }
+                
+                // Create a blob URL with proper MIME type
+                const mimeType = getMimeType(fileName);
+                const blobUrl = window.URL.createObjectURL(new Blob([blob], { type: mimeType }));
+                
+                // Method 1a: Modern browser download API
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = fileName;
+                link.style.display = 'none';
+                link.setAttribute('download', fileName);
+                link.setAttribute('type', 'application/octet-stream');
+                
+                // Trigger download
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Clean up the blob URL after a short delay
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(blobUrl);
+                }, 1000);
+                
+                console.log(`File "${fileName}" (${formatFileSize(blob.size)}) downloaded successfully`);
+                return;
+                
+            } catch (fetchError) {
+                console.warn('Fetch method failed, trying fallback methods:', fetchError);
+                
+                // Method 2: For images, try canvas method
+                if (message.message_type === 'image') {
+                    try {
+                        await downloadImageViaCanvas(message.file_url, fileName);
+                        return;
+                    } catch (canvasError) {
+                        console.warn('Canvas method failed:', canvasError);
+                    }
+                }
+                
+                // Method 3: Direct link method with proper attributes
+                try {
+                    const link = document.createElement('a');
+                    link.href = message.file_url;
+                    link.download = fileName;
+                    link.style.display = 'none';
+                    link.setAttribute('download', fileName);
+                    link.setAttribute('type', 'application/octet-stream');
+                    link.setAttribute('target', '_blank');
+                    
+                    // Add timestamp to prevent caching issues
+                    const url = new URL(message.file_url);
+                    url.searchParams.set('download', Date.now().toString());
+                    url.searchParams.set('filename', fileName);
+                    
+                    link.href = url.toString();
+                    
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    console.log(`File "${fileName}" download initiated via direct link`);
+                    return;
+                    
+                } catch (directError) {
+                    console.warn('Direct link method failed:', directError);
+                }
+                
+                // Method 4: Open in new tab as last resort
+                try {
+                    window.open(message.file_url, '_blank', 'noopener,noreferrer');
+                    console.log(`File "${fileName}" opened in new tab for manual download`);
+                    return;
+                } catch (openError) {
+                    console.warn('Open in new tab failed:', openError);
+                }
+                
+                // If all methods fail, throw error
+                throw new Error('All download methods failed');
+            }
+        };
+
+        // Enhanced image download function
+        const downloadImageToLocal = async (imageUrl: string, fileName: string): Promise<void> => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        if (!ctx) {
+                            reject(new Error('Could not get canvas context'));
+                            return;
+                        }
+                        
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        
+                        const mimeType = getMimeType(fileName);
+                        
+                        canvas.toBlob((blob) => {
+                            if (blob) {
+                                const url = window.URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = fileName;
+                                link.style.display = 'none';
+                                link.setAttribute('download', fileName);
+                                link.setAttribute('type', 'application/octet-stream');
+                                
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                
+                                setTimeout(() => {
+                                    window.URL.revokeObjectURL(url);
+                                }, 1000);
+                                
+                                console.log(`Image "${fileName}" downloaded successfully`);
+                                resolve();
+                            } else {
+                                reject(new Error('Failed to create blob from canvas'));
+                            }
+                        }, mimeType, 0.9);
+                        
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                img.onerror = () => {
+                    reject(new Error('Failed to load image for download'));
+                };
+                
+                img.src = imageUrl;
+            });
+        };
+
+        // Helper function for downloading images via canvas
+        const downloadImageViaCanvas = (imageUrl: string, fileName: string): Promise<void> => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        if (!ctx) {
+                            reject(new Error('Could not get canvas context'));
+                            return;
+                        }
+                        
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        
+                        const mimeType = getMimeType(fileName);
+                        
+                        canvas.toBlob((blob) => {
+                            if (blob) {
+                                const url = window.URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = fileName;
+                                link.style.display = 'none';
+                                link.setAttribute('download', fileName);
+                                link.setAttribute('type', 'application/octet-stream');
+                                
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                
+                                setTimeout(() => {
+                                    window.URL.revokeObjectURL(url);
+                                }, 1000);
+                                
+                                resolve();
+                            } else {
+                                reject(new Error('Failed to create blob from canvas'));
+                            }
+                        }, mimeType, 0.9);
+                        
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                img.onerror = () => {
+                    reject(new Error('Failed to load image for canvas download'));
+                };
+                
+                img.src = imageUrl;
+            });
+        };
+
+        // Get file icon based on type
+        const getFileIcon = (fileName: string, messageType: string) => {
+            const extension = getFileExtension(fileName);
+            
+            if (messageType === 'image') return <ImageIcon className="w-5 h-5" />;
+            
+            switch (extension) {
+                case 'pdf': return <FileText className="w-5 h-5" />;
+                case 'doc':
+                case 'docx': return <FileText className="w-5 h-5" />;
+                case 'mp4':
+                case 'avi':
+                case 'mov':
+                case 'wmv': return <FileVideo className="w-5 h-5" />;
+                case 'mp3':
+                case 'wav':
+                case 'flac': return <FileAudio className="w-5 h-5" />;
+                case 'zip':
+                case 'rar':
+                case '7z': return <Archive className="w-5 h-5" />;
+                case 'js':
+                case 'ts':
+                case 'jsx':
+                case 'tsx':
+                case 'html':
+                case 'css':
+                case 'json': return <Code className="w-5 h-5" />;
+                default: return <File className="w-5 h-5" />;
+            }
+        };
+
+        // Get file color based on type
+        const getFileColor = (fileName: string, messageType: string) => {
+            const extension = getFileExtension(fileName);
+            
+            if (messageType === 'image') return 'from-emerald-500 to-teal-600';
+            
+            switch (extension) {
+                case 'pdf': return 'from-red-500 to-pink-600';
+                case 'doc':
+                case 'docx': return 'from-blue-500 to-indigo-600';
+                case 'mp4':
+                case 'avi':
+                case 'mov':
+                case 'wmv': return 'from-purple-500 to-violet-600';
+                case 'mp3':
+                case 'wav':
+                case 'flac': return 'from-orange-500 to-amber-600';
+                case 'zip':
+                case 'rar':
+                case '7z': return 'from-yellow-500 to-orange-600';
+                case 'js':
+                case 'ts':
+                case 'jsx':
+                case 'tsx':
+                case 'html':
+                case 'css':
+                case 'json': return 'from-indigo-500 to-purple-600';
+                default: return 'from-slate-500 to-gray-600';
+            }
         };
 
         // Close dropdown when clicking outside
@@ -652,35 +1107,111 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
 
         return (
             <div className="relative" ref={dropdownRef}>
+
                 <button
+                    ref={buttonRef}
                     onClick={toggleDropdown}
-                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                    className={`p-2.5 rounded-xl transition-all duration-300 border-2 ${
+                        isOpen 
+                            ? 'bg-gradient-to-r from-pink-100 to-purple-100 dark:from-pink-900/30 dark:to-purple-900/30 border-pink-300 dark:border-pink-700 shadow-lg scale-105' 
+                            : 'hover:bg-gradient-to-r hover:from-slate-100 hover:to-gray-100 dark:hover:from-slate-700 dark:hover:to-gray-700 border-transparent hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-md hover:scale-105'
+                    }`}
                     aria-label="File options"
                 >
-                    <MoreVertical className="w-4 h-4 text-slate-500" />
+                    <MoreVertical className={`w-4 h-4 transition-colors duration-300 ${
+                        isOpen ? 'text-pink-600 dark:text-pink-400' : 'text-slate-500'
+                    }`} />
                 </button>
                 
                 {isOpen && (
-                    <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
-                        <button
-                            onClick={handleOpen}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                        >
-                            <Eye className="w-4 h-4" />
-                            Open
-                        </button>
-                        <button
-                            onClick={handleDownload}
-                            disabled={isDownloading}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isDownloading ? (
-                                <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                                <Download className="w-4 h-4" />
-                            )}
-                            {isDownloading ? 'Downloading...' : 'Download'}
-                        </button>
+                    <div className="absolute top-full right-0 mt-3 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-[9999] backdrop-blur-xl animate-in slide-in-from-top-2 duration-300">
+                        {/* File Info Header */}
+                        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800/50 dark:to-gray-800/50 rounded-t-2xl">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 bg-gradient-to-br ${getFileColor(message.file_name || '', message.message_type)} rounded-xl flex items-center justify-center shadow-lg`}>
+                                    {getFileIcon(message.file_name || '', message.message_type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                        {message.file_name}
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                        {message.formatted_file_size || (message.file_size ? formatFileSize(parseInt(message.file_size)) : 'Unknown size')}
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 capitalize mt-1 flex items-center gap-1">
+                                        <Sparkles className="w-3 h-3" />
+                                        {getFileExtension(message.file_name || '')} file
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="p-3 space-y-2">
+                            <button
+                                onClick={handleOpen}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 rounded-xl transition-all duration-300 hover:shadow-md group"
+                            >
+                                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                    {message.message_type === 'image' ? (
+                                        <Maximize2 className="w-4 h-4 text-white" />
+                                    ) : (
+                                        <Eye className="w-4 h-4 text-white" />
+                                    )}
+                                </div>
+                                <span className="font-semibold">
+                                    {message.message_type === 'image' ? 'View Image' : 'Open File'}
+                                </span>
+                                <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors duration-300" />
+                            </button>
+                            
+                            <button
+                                onClick={handleDownload}
+                                disabled={isDownloading}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 rounded-xl transition-all duration-300 hover:shadow-md group disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
+                            >
+                                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                    {isDownloading ? (
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <Download className="w-4 h-4 text-white" />
+                                    )}
+                                </div>
+                                <span className="font-semibold">
+                                    {isDownloading ? (
+                                        downloadProgress > 0 ? `Downloading ${downloadProgress}%` : 'Downloading...'
+                                    ) : (
+                                        message.message_type === 'image' ? 'Download Image' : 'Download File'
+                                    )}
+                                </span>
+                                {isDownloading && downloadProgress > 0 && (
+                                    <div className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-green-500 to-emerald-600 transition-all duration-300 rounded-b-xl" 
+                                         style={{ width: `${downloadProgress}%` }} />
+                                )}
+                            </button>
+                            
+                            <button
+                                onClick={handleShare}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 dark:hover:from-purple-900/20 dark:hover:to-pink-900/20 rounded-xl transition-all duration-300 hover:shadow-md group"
+                            >
+                                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                    <Share2 className="w-4 h-4 text-white" />
+                                </div>
+                                <span className="font-semibold">Share File</span>
+                                <Zap className="w-4 h-4 text-slate-400 group-hover:text-purple-500 transition-colors duration-300" />
+                            </button>
+                            
+                            <button
+                                onClick={handleCopyLink}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 dark:hover:from-orange-900/20 dark:hover:to-amber-900/20 rounded-xl transition-all duration-300 hover:shadow-md group"
+                            >
+                                <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                    <Copy className="w-4 h-4 text-white" />
+                                </div>
+                                <span className="font-semibold">Copy Link</span>
+                                <Star className="w-4 h-4 text-slate-400 group-hover:text-orange-500 transition-colors duration-300" />
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -690,50 +1221,139 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
     const renderMessageContent = (message: Message) => {
         if (message.message_type === 'file') {
             return (
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                        <div className="flex items-center gap-2 flex-1">
-                            <File className="w-4 h-4 text-slate-500" />
-                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
-                                {message.file_name}
-                            </span>
-                            {message.formatted_file_size && (
-                                <span className="text-xs text-slate-500">
-                                    ({message.formatted_file_size})
-                                </span>
-                            )}
+                <div className="space-y-3">
+                    <div className="group relative overflow-hidden bg-gradient-to-r from-white to-slate-50 dark:from-slate-800 dark:to-slate-700 rounded-2xl border border-slate-200 dark:border-slate-600 shadow-lg hover:shadow-xl transition-all duration-500 hover:scale-[1.02]">
+                        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        <div className="relative flex items-center justify-between p-5">
+                            <div className="flex items-center gap-4 flex-1">
+                                <div className={`w-14 h-14 bg-gradient-to-br ${getFileColor(message.file_name || '', message.message_type)} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                                    {getFileIcon(message.file_name || '', message.message_type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors duration-300">
+                                        {message.file_name}
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+                                        <span>{message.formatted_file_size || (message.file_size ? formatFileSize(parseInt(message.file_size)) : 'Unknown size')}</span>
+                                        <span className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full" />
+                                        <span className="capitalize">{getFileExtension(message.file_name || '')} file</span>
+                                    </div>
+                                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                                        <Sparkles className="w-3 h-3" />
+                                        <span>Click to view options</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <FileDropdown message={message} />
                         </div>
-                        <FileDropdown message={message} />
                     </div>
                     {message.message && message.message !== message.file_name && (
-                        <p className="text-sm">{message.message}</p>
+                        <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                            {message.message}
+                        </p>
                     )}
                 </div>
             );
         } else if (message.message_type === 'image') {
             return (
-                <div className="space-y-2">
+                <div className="space-y-3">
                     {message.file_url && (
-                        <div className="relative group">
+                        <div className="relative group overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:scale-[1.02]">
                             <img
                                 src={message.file_url}
                                 alt={message.file_name || 'Image'}
-                                className="max-w-full max-h-64 rounded-lg object-cover cursor-pointer"
-                                onClick={() => window.open(message.file_url, '_blank')}
+                                className="max-w-full max-h-80 w-full object-cover cursor-pointer transition-all duration-500 group-hover:brightness-110"
+                                onClick={() => setImageViewer({
+                                    isOpen: true,
+                                    imageUrl: message.file_url || '',
+                                    imageName: message.file_name || 'Image',
+                                    imageSize: message.file_size ? formatFileSize(parseInt(message.file_size)) : undefined
+                                })}
                             />
-                            <div className="absolute top-2 right-2">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
                                 <FileDropdown message={message} />
+                            </div>
+                            <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+                                <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm text-white px-3 py-2 rounded-xl text-sm">
+                                    <ImageIcon className="w-4 h-4" />
+                                    <span>Click to view full size</span>
+                                </div>
                             </div>
                         </div>
                     )}
                     {message.message && (
-                        <p className="text-sm">{message.message}</p>
+                        <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                            {message.message}
+                        </p>
                     )}
                 </div>
             );
         }
         
-        return <p className="text-sm">{message.message}</p>;
+        return <p className="text-sm text-slate-700 dark:text-slate-300">{message.message}</p>;
+    };
+
+    // Get file icon based on type (for use in renderMessageContent)
+    const getFileIcon = (fileName: string, messageType: string) => {
+        const extension = getFileExtension(fileName);
+        
+        if (messageType === 'image') return <ImageIcon className="w-6 h-6 text-white" />;
+        
+        switch (extension) {
+            case 'pdf': return <FileText className="w-6 h-6 text-white" />;
+            case 'doc':
+            case 'docx': return <FileText className="w-6 h-6 text-white" />;
+            case 'mp4':
+            case 'avi':
+            case 'mov':
+            case 'wmv': return <FileVideo className="w-6 h-6 text-white" />;
+            case 'mp3':
+            case 'wav':
+            case 'flac': return <FileAudio className="w-6 h-6 text-white" />;
+            case 'zip':
+            case 'rar':
+            case '7z': return <Archive className="w-6 h-6 text-white" />;
+            case 'js':
+            case 'ts':
+            case 'jsx':
+            case 'tsx':
+            case 'html':
+            case 'css':
+            case 'json': return <Code className="w-6 h-6 text-white" />;
+            default: return <File className="w-6 h-6 text-white" />;
+        }
+    };
+
+    // Get file color based on type (for use in renderMessageContent)
+    const getFileColor = (fileName: string, messageType: string) => {
+        const extension = getFileExtension(fileName);
+        
+        if (messageType === 'image') return 'from-emerald-500 to-teal-600';
+        
+        switch (extension) {
+            case 'pdf': return 'from-red-500 to-pink-600';
+            case 'doc':
+            case 'docx': return 'from-blue-500 to-indigo-600';
+            case 'mp4':
+            case 'avi':
+            case 'mov':
+            case 'wmv': return 'from-purple-500 to-violet-600';
+            case 'mp3':
+            case 'wav':
+            case 'flac': return 'from-orange-500 to-amber-600';
+            case 'zip':
+            case 'rar':
+            case '7z': return 'from-yellow-500 to-orange-600';
+            case 'js':
+            case 'ts':
+            case 'jsx':
+            case 'tsx':
+            case 'html':
+            case 'css':
+            case 'json': return 'from-indigo-500 to-purple-600';
+            default: return 'from-slate-500 to-gray-600';
+        }
     };
 
     return (
@@ -973,10 +1593,10 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200"
+                                    className="p-3 rounded-xl hover:bg-gradient-to-r hover:from-pink-50 hover:to-purple-50 dark:hover:from-pink-900/20 dark:hover:to-purple-900/20 transition-all duration-300 hover:shadow-md group"
                                     aria-label="Attach file"
                                 >
-                                    <Paperclip className="w-5 h-5 text-slate-500" />
+                                    <Paperclip className="w-5 h-5 text-slate-500 group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors duration-300" />
                                 </button>
                                 
                                 <input
@@ -984,30 +1604,55 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                                     type="file"
                                     onChange={handleFileSelect}
                                     className="hidden"
-                                    accept="image/*,.pdf,.doc,.docx,.txt"
+                                    accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar,.mp3,.mp4,.wav,.flac,.avi,.mov,.wmv,.js,.ts,.jsx,.tsx,.html,.css,.json"
                                 />
 
-                                {/* File preview */}
+                                {/* Enhanced File preview */}
                                 {selectedFile && (
-                                    <div className="flex items-center gap-2 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                                        {filePreview ? (
-                                            <img src={filePreview} alt="Preview" className="w-8 h-8 rounded object-cover" />
-                                        ) : (
-                                            <File className="w-8 h-8 text-slate-500" />
-                                        )}
-                                        <span className="text-sm text-slate-600 dark:text-slate-300">
-                                            {selectedFile.name}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setSelectedFile(null);
-                                                setFilePreview(null);
-                                            }}
-                                            className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
+                                    <div className="group relative overflow-hidden bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-2xl border border-pink-200 dark:border-pink-800 shadow-lg hover:shadow-xl transition-all duration-500 hover:scale-[1.02] animate-in slide-in-from-bottom-2 duration-300">
+                                        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                        <div className="relative flex items-center gap-4 p-4">
+                                            {filePreview ? (
+                                                <div className="relative">
+                                                    <img 
+                                                        src={filePreview} 
+                                                        alt="Preview" 
+                                                        className="w-12 h-12 rounded-xl object-cover border-2 border-pink-200 dark:border-pink-700 shadow-md group-hover:scale-110 transition-transform duration-300" 
+                                                    />
+                                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
+                                                        <ImageIcon className="w-2.5 h-2.5 text-white" />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className={`w-12 h-12 bg-gradient-to-br ${getFileColor(selectedFile.name, selectedFile.type.startsWith('image/') ? 'image' : 'file')} rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300`}>
+                                                    {getFileIcon(selectedFile.name, selectedFile.type.startsWith('image/') ? 'image' : 'file')}
+                                                </div>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors duration-300">
+                                                    {selectedFile.name}
+                                                </div>
+                                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+                                                    <span>{formatFileSize(selectedFile.size)}</span>
+                                                    <span className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full" />
+                                                    <span className="capitalize">{getFileExtension(selectedFile.name)} file</span>
+                                                </div>
+                                                <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                                                    <Sparkles className="w-3 h-3" />
+                                                    <span>Ready to send</span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedFile(null);
+                                                    setFilePreview(null);
+                                                }}
+                                                className="p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-all duration-300 hover:shadow-md group-hover:scale-110"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                                 
@@ -1053,10 +1698,10 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                                     type="submit"
                                     size="sm"
                                     disabled={(!input.trim() && !selectedFile) || !selectedRoom}
-                                    className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 h-10 rounded-2xl shadow-lg transition-all duration-200 hover:shadow-xl"
+                                    className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed px-6 py-3 h-12 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 group"
                                 >
-                                    <Send />
-                                    <span className="hidden md:inline font-medium">Enviar</span>
+                                    <Send className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
+                                    <span className="hidden md:inline font-semibold ml-2">Enviar</span>
                                 </Button>
                             </form>
                         </>
@@ -1078,6 +1723,113 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                     className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-30"
                     onClick={() => setSidebarOpen(false)}
                 />
+            )}
+
+            {/* Image Viewer */}
+            {imageViewer.isOpen && createPortal(
+                <div 
+                    ref={imageViewerRef}
+                    className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm flex items-center justify-center"
+                    onClick={() => {
+                        setImageViewer({ isOpen: false, imageUrl: '', imageName: '', imageSize: '' });
+                        setImageZoom(1);
+                        setImageRotation(0);
+                    }}
+                >
+                    {/* Image Container */}
+                    <div 
+                        className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <img
+                            src={imageViewer.imageUrl}
+                            alt={imageViewer.imageName}
+                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                            style={{
+                                transform: `scale(${imageZoom}) rotate(${imageRotation}deg)`,
+                                transition: 'transform 0.3s ease-in-out'
+                            }}
+                            draggable={false}
+                        />
+                    </div>
+
+                    {/* Controls */}
+                    <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-xl p-2 border border-white/20">
+                        <button
+                            onClick={() => setImageZoom(prev => Math.max(prev - 0.25, 0.25))}
+                            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                            title="Zoom Out"
+                        >
+                            <ZoomOut className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => setImageZoom(prev => Math.min(prev + 0.25, 3))}
+                            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                            title="Zoom In"
+                        >
+                            <ZoomIn className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => setImageRotation(prev => (prev + 90) % 360)}
+                            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                            title="Rotate"
+                        >
+                            <RotateCcw className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => {
+                                setImageZoom(1);
+                                setImageRotation(0);
+                            }}
+                            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                            title="Reset"
+                        >
+                            <Minimize2 className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={async () => {
+                                try {
+                                    await downloadImageToLocal(imageViewer.imageUrl, imageViewer.imageName);
+                                } catch (error) {
+                                    console.error('Error downloading image:', error);
+                                    alert('Failed to download image. Please try again.');
+                                }
+                            }}
+                            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                            title="Download"
+                        >
+                            <Download className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => {
+                                setImageViewer({ isOpen: false, imageUrl: '', imageName: '', imageSize: '' });
+                                setImageZoom(1);
+                                setImageRotation(0);
+                            }}
+                            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
+                            title="Close"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {/* Image Info */}
+                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 backdrop-blur-sm rounded-xl p-3 border border-white/20">
+                        <div className="text-white text-center">
+                            <div className="font-medium">{imageViewer.imageName}</div>
+                            {imageViewer.imageSize && (
+                                <div className="text-sm text-white/70">{imageViewer.imageSize}</div>
+                            )}
+                            <div className="text-sm text-white/70">
+                                Zoom: {Math.round(imageZoom * 100)}% | Rotation: {imageRotation}°
+                            </div>
+                            <div className="text-xs text-white/50 mt-1">
+                                Press + / - to zoom, R to rotate, 0 to reset, D to download, ESC to close
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );
