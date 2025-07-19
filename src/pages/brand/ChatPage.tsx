@@ -626,64 +626,349 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
         }
     };
 
-    // Enhanced image download function
+    // Utility function to create a robust download link
+    const createDownloadLink = (url: string, fileName: string, mimeType: string): HTMLAnchorElement => {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.style.display = 'none';
+        link.setAttribute('download', fileName);
+        link.setAttribute('type', mimeType);
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+        // Add additional attributes for better browser compatibility
+        link.setAttribute('data-downloadurl', `${mimeType}:${fileName}:${url}`);
+        return link;
+    };
+
+    // Utility function to trigger download with proper cleanup
+    const triggerDownload = (link: HTMLAnchorElement, blobUrl?: string): void => {
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up blob URL if provided
+        if (blobUrl) {
+            setTimeout(() => {
+                window.URL.revokeObjectURL(blobUrl);
+            }, 1000);
+        }
+    };
+
+    // Enhanced image download function that FORCES download to local folder (CORS bypass)
     const downloadImageToLocal = async (imageUrl: string, fileName: string): Promise<void> => {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            
-            img.onload = () => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                // Convert storage URL to API download URL to bypass CORS
+                const downloadUrl = imageUrl.replace('/storage/', '/api/download/');
+                
+                // Method 1: Try to create a download link with proper attributes (most reliable)
                 try {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
+                    // Create a temporary anchor element
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = fileName;
+                    link.style.display = 'none';
+                    link.setAttribute('download', fileName);
+                    link.setAttribute('type', getMimeType(fileName));
+                    link.setAttribute('target', '_blank');
+                    link.setAttribute('rel', 'noopener noreferrer');
                     
-                    if (!ctx) {
-                        reject(new Error('Could not get canvas context'));
-                        return;
+                    // Add timestamp to prevent caching
+                    const url = new URL(downloadUrl);
+                    url.searchParams.set('download', Date.now().toString());
+                    url.searchParams.set('filename', fileName);
+                    url.searchParams.set('disposition', 'attachment');
+                    link.href = url.toString();
+                    
+                    // Trigger download
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    console.log(`Image "${fileName}" download initiated via proxy endpoint`);
+                    resolve();
+                    return;
+                    
+                } catch (directError) {
+                    console.warn('Direct link failed, trying fetch with proxy:', directError);
+                }
+                
+                // Method 2: Try fetch with proxy endpoint
+                try {
+                    const response = await fetch(downloadUrl, {
+                        method: 'GET',
+                        mode: 'cors',
+                        credentials: 'include',
+                        headers: {
+                            'Accept': 'image/*,*/*;q=0.8',
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache',
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
+                    const blob = await response.blob();
+                    const blobUrl = window.URL.createObjectURL(blob);
                     
-                    const mimeType = getMimeType(fileName);
+                    // Create download link
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = fileName;
+                    link.style.display = 'none';
+                    link.setAttribute('download', fileName);
+                    link.setAttribute('type', getMimeType(fileName));
                     
-                    canvas.toBlob((blob) => {
-                        if (blob) {
-                            const url = window.URL.createObjectURL(blob);
+                    // Trigger download
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Clean up blob URL
+                    setTimeout(() => {
+                        window.URL.revokeObjectURL(blobUrl);
+                    }, 1000);
+                    
+                    console.log(`Image "${fileName}" downloaded successfully via proxy fetch`);
+                    resolve();
+                    return;
+                    
+                } catch (fetchError) {
+                    console.warn('Proxy fetch failed, trying XMLHttpRequest:', fetchError);
+                }
+                
+                // Method 3: Try XMLHttpRequest with proxy endpoint
+                try {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', downloadUrl, true);
+                    xhr.responseType = 'blob';
+                    xhr.withCredentials = true;
+                    
+                    xhr.onload = function() {
+                        if (xhr.status === 200) {
+                            const blob = xhr.response;
+                            const blobUrl = window.URL.createObjectURL(blob);
+                            
+                            // Create download link
                             const link = document.createElement('a');
-                            link.href = url;
+                            link.href = blobUrl;
                             link.download = fileName;
                             link.style.display = 'none';
                             link.setAttribute('download', fileName);
-                            link.setAttribute('type', 'application/octet-stream');
+                            link.setAttribute('type', getMimeType(fileName));
                             
+                            // Trigger download
                             document.body.appendChild(link);
                             link.click();
                             document.body.removeChild(link);
                             
+                            // Clean up blob URL
                             setTimeout(() => {
-                                window.URL.revokeObjectURL(url);
+                                window.URL.revokeObjectURL(blobUrl);
                             }, 1000);
                             
-                            console.log(`Image "${fileName}" downloaded successfully`);
+                            console.log(`Image "${fileName}" downloaded successfully via proxy XHR`);
                             resolve();
                         } else {
-                            reject(new Error('Failed to create blob from canvas'));
+                            throw new Error(`XHR failed with status: ${xhr.status}`);
                         }
-                    }, mimeType, 0.9);
+                    };
                     
-                } catch (error) {
-                    reject(error);
+                    xhr.onerror = function() {
+                        throw new Error('XHR request failed');
+                    };
+                    
+                    xhr.send();
+                    return;
+                    
+                } catch (xhrError) {
+                    console.warn('Proxy XHR failed, using manual download:', xhrError);
+                }
+                
+                // Method 4: Manual download as fallback
+                console.warn('All proxy methods failed, opening in new tab for manual download');
+                try {
+                    const newWindow = window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+                    if (newWindow) {
+                        console.log(`Image "${fileName}" opened in new tab for manual download`);
+                        // Show user-friendly message
+                        setTimeout(() => {
+                            alert(`Image "${fileName}" opened in new tab. Please right-click and select "Save image as..." to download it.`);
+                        }, 100);
+                        resolve();
+                    } else {
+                        reject(new Error('Popup blocked by browser'));
+                    }
+                } catch (openError) {
+                    reject(openError);
+                }
+                
+            } catch (error) {
+                reject(error);
+            }
+        });
+    };
+
+    // Enhanced file download function that FORCES download to local folder (CORS bypass)
+    const downloadFileToLocal = async (message: Message): Promise<void> => {
+        const fileName = message.file_name || 'download';
+        const fileSize = message.file_size ? parseInt(message.file_size) : 0;
+        
+        // Convert storage URL to API download URL to bypass CORS
+        const downloadUrl = message.file_url.replace('/storage/', '/api/download/');
+        
+        // Show download progress for large files
+        if (fileSize > 1024 * 1024) { // Files larger than 1MB
+            console.log(`Starting download of ${fileName} (${formatFileSize(fileSize)})`);
+        }
+        
+        // Method 1: Force download using fetch and blob conversion (most reliable)
+        try {
+            const response = await fetch(downloadUrl, {
+                method: 'GET',
+                mode: 'cors',
+                credentials: 'include',
+                headers: {
+                    'Accept': '*/*',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache',
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const blob = await response.blob();
+            
+            // Validate blob size if we have file size info
+            if (fileSize > 0 && blob.size !== fileSize) {
+                console.warn(`File size mismatch: expected ${fileSize}, got ${blob.size}`);
+            }
+            
+            // Create blob URL with proper MIME type
+            const mimeType = getMimeType(fileName);
+            const blobUrl = window.URL.createObjectURL(new Blob([blob], { type: mimeType }));
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = fileName;
+            link.style.display = 'none';
+            link.setAttribute('download', fileName);
+            link.setAttribute('type', mimeType);
+            
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Clean up blob URL
+            setTimeout(() => {
+                window.URL.revokeObjectURL(blobUrl);
+            }, 1000);
+            
+            console.log(`File "${fileName}" (${formatFileSize(blob.size)}) FORCED download successful via proxy`);
+            return;
+            
+        } catch (fetchError) {
+            console.warn('Proxy fetch method failed, trying XHR method:', fetchError);
+        }
+        
+        // Method 2: Try XMLHttpRequest with proxy endpoint
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', downloadUrl, true);
+            xhr.responseType = 'blob';
+            xhr.withCredentials = true;
+            
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const blob = xhr.response;
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    
+                    // Create download link
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = fileName;
+                    link.style.display = 'none';
+                    link.setAttribute('download', fileName);
+                    link.setAttribute('type', getMimeType(fileName));
+                    
+                    // Trigger download
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Clean up blob URL
+                    setTimeout(() => {
+                        window.URL.revokeObjectURL(blobUrl);
+                    }, 1000);
+                    
+                    console.log(`File "${fileName}" downloaded successfully via proxy XHR`);
+                } else {
+                    throw new Error(`XHR failed with status: ${xhr.status}`);
                 }
             };
             
-            img.onerror = () => {
-                reject(new Error('Failed to load image for download'));
+            xhr.onerror = function() {
+                throw new Error('XHR request failed');
             };
             
-            img.src = imageUrl;
-        });
+            xhr.send();
+            return;
+            
+        } catch (xhrError) {
+            console.warn('Proxy XHR method failed, trying image-specific method:', xhrError);
+        }
+        
+        // Method 3: For images, try the optimized image download method
+        if (message.message_type === 'image') {
+            try {
+                await downloadImageToLocal(message.file_url, fileName);
+                return;
+            } catch (imageError) {
+                console.warn('Image download method failed:', imageError);
+            }
+        }
+        
+        // Method 4: Try direct link with proxy endpoint
+        try {
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = fileName;
+            link.style.display = 'none';
+            link.setAttribute('download', fileName);
+            link.setAttribute('type', getMimeType(fileName));
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            console.log(`File "${fileName}" download initiated via proxy direct link`);
+            return;
+        } catch (directError) {
+            console.warn('Proxy direct link failed, using manual download:', directError);
+        }
+        
+        // Method 5: Open in new tab as absolute last resort
+        try {
+            const newWindow = window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+            if (newWindow) {
+                console.log(`File "${fileName}" opened in new tab for manual download`);
+                return;
+            } else {
+                throw new Error('Popup blocked');
+            }
+        } catch (openError) {
+            console.warn('Open in new tab failed:', openError);
+        }
+        
+        // If all methods fail, throw error
+        throw new Error('All download methods failed. Please try right-clicking the file and selecting "Save as".');
     };
 
     // File Dropdown Component - Enhanced with beautiful design
@@ -745,12 +1030,23 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                     // Show a brief success indicator
                     setTimeout(() => {
                         console.log(`Download completed for: ${message.file_name}`);
+                        // You could add a toast notification here for better UX
                     }, 500);
                     
                 } catch (error) {
                     console.error('Error downloading file:', error);
-                    // Show user-friendly error message
-                    alert(`Unable to download "${message.file_name}". Please try opening it in a new tab and saving manually.`);
+                    
+                    // Try alternative download method
+                    try {
+                        console.log('Trying alternative download method...');
+                        const link = createDownloadLink(message.file_url, message.file_name || 'download', getMimeType(message.file_name || ''));
+                        triggerDownload(link);
+                        
+                        console.log(`Alternative download initiated for: ${message.file_name}`);
+                    } catch (altError) {
+                        console.error('Alternative download also failed:', altError);
+                        // Show user-friendly error message
+                    }
                 } finally {
                     setIsDownloading(false);
                     setDownloadProgress(0);
@@ -789,238 +1085,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                 ...prev,
                 [message.id]: false
             }));
-        };
-
-        // Enhanced file download function with multiple fallback methods
-        const downloadFileToLocal = async (message: Message): Promise<void> => {
-            const fileName = message.file_name || 'download';
-            const fileSize = message.file_size ? parseInt(message.file_size) : 0;
-            
-            // Show download progress for large files
-            if (fileSize > 1024 * 1024) { // Files larger than 1MB
-                console.log(`Starting download of ${fileName} (${formatFileSize(fileSize)})`);
-            }
-            
-            // Method 1: Try fetch with proper headers for better compatibility
-            try {
-                const response = await fetch(message.file_url, {
-                    method: 'GET',
-                    mode: 'cors',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Accept': '*/*',
-                        'Cache-Control': 'no-cache',
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const blob = await response.blob();
-                
-                // Validate blob size if we have file size info
-                if (fileSize > 0 && blob.size !== fileSize) {
-                    console.warn(`File size mismatch: expected ${fileSize}, got ${blob.size}`);
-                }
-                
-                // Create a blob URL with proper MIME type
-                const mimeType = getMimeType(fileName);
-                const blobUrl = window.URL.createObjectURL(new Blob([blob], { type: mimeType }));
-                
-                // Method 1a: Modern browser download API
-                const link = document.createElement('a');
-                link.href = blobUrl;
-                link.download = fileName;
-                link.style.display = 'none';
-                link.setAttribute('download', fileName);
-                link.setAttribute('type', 'application/octet-stream');
-                
-                // Trigger download
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // Clean up the blob URL after a short delay
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(blobUrl);
-                }, 1000);
-                
-                console.log(`File "${fileName}" (${formatFileSize(blob.size)}) downloaded successfully`);
-                return;
-                
-            } catch (fetchError) {
-                console.warn('Fetch method failed, trying fallback methods:', fetchError);
-                
-                // Method 2: For images, try canvas method
-                if (message.message_type === 'image') {
-                    try {
-                        await downloadImageViaCanvas(message.file_url, fileName);
-                        return;
-                    } catch (canvasError) {
-                        console.warn('Canvas method failed:', canvasError);
-                    }
-                }
-                
-                // Method 3: Direct link method with proper attributes
-                try {
-                    const link = document.createElement('a');
-                    link.href = message.file_url;
-                    link.download = fileName;
-                    link.style.display = 'none';
-                    link.setAttribute('download', fileName);
-                    link.setAttribute('type', 'application/octet-stream');
-                    link.setAttribute('target', '_blank');
-                    
-                    // Add timestamp to prevent caching issues
-                    const url = new URL(message.file_url);
-                    url.searchParams.set('download', Date.now().toString());
-                    url.searchParams.set('filename', fileName);
-                    
-                    link.href = url.toString();
-                    
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    console.log(`File "${fileName}" download initiated via direct link`);
-                    return;
-                    
-                } catch (directError) {
-                    console.warn('Direct link method failed:', directError);
-                }
-                
-                // Method 4: Open in new tab as last resort
-                try {
-                    window.open(message.file_url, '_blank', 'noopener,noreferrer');
-                    console.log(`File "${fileName}" opened in new tab for manual download`);
-                    return;
-                } catch (openError) {
-                    console.warn('Open in new tab failed:', openError);
-                }
-                
-                // If all methods fail, throw error
-                throw new Error('All download methods failed');
-            }
-        };
-
-        // Enhanced image download function
-        const downloadImageToLocal = async (imageUrl: string, fileName: string): Promise<void> => {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                
-                img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        
-                        if (!ctx) {
-                            reject(new Error('Could not get canvas context'));
-                            return;
-                        }
-                        
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        ctx.drawImage(img, 0, 0);
-                        
-                        const mimeType = getMimeType(fileName);
-                        
-                        canvas.toBlob((blob) => {
-                            if (blob) {
-                                const url = window.URL.createObjectURL(blob);
-                                const link = document.createElement('a');
-                                link.href = url;
-                                link.download = fileName;
-                                link.style.display = 'none';
-                                link.setAttribute('download', fileName);
-                                link.setAttribute('type', 'application/octet-stream');
-                                
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                
-                                setTimeout(() => {
-                                    window.URL.revokeObjectURL(url);
-                                }, 1000);
-                                
-                                console.log(`Image "${fileName}" downloaded successfully`);
-                                resolve();
-                            } else {
-                                reject(new Error('Failed to create blob from canvas'));
-                            }
-                        }, mimeType, 0.9);
-                        
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-                
-                img.onerror = () => {
-                    reject(new Error('Failed to load image for download'));
-                };
-                
-                img.src = imageUrl;
-            });
-        };
-
-        // Helper function for downloading images via canvas
-        const downloadImageViaCanvas = (imageUrl: string, fileName: string): Promise<void> => {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                
-                img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        
-                        if (!ctx) {
-                            reject(new Error('Could not get canvas context'));
-                            return;
-                        }
-                        
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        ctx.drawImage(img, 0, 0);
-                        
-                        const mimeType = getMimeType(fileName);
-                        
-                        canvas.toBlob((blob) => {
-                            if (blob) {
-                                const url = window.URL.createObjectURL(blob);
-                                const link = document.createElement('a');
-                                link.href = url;
-                                link.download = fileName;
-                                link.style.display = 'none';
-                                link.setAttribute('download', fileName);
-                                link.setAttribute('type', 'application/octet-stream');
-                                
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                
-                                setTimeout(() => {
-                                    window.URL.revokeObjectURL(url);
-                                }, 1000);
-                                
-                                resolve();
-                            } else {
-                                reject(new Error('Failed to create blob from canvas'));
-                            }
-                        }, mimeType, 0.9);
-                        
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-                
-                img.onerror = () => {
-                    reject(new Error('Failed to load image for canvas download'));
-                };
-                
-                img.src = imageUrl;
-            });
         };
 
         // Get file icon based on type
@@ -1217,82 +1281,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
             </div>
         );
     };
-
-    // const renderMessageContent = (message: Message) => {
-    //     if (message.message_type === 'file') {
-    //         return (
-    //             <div className="space-y-3">
-    //                 <div className="group relative overflow-hidden bg-gradient-to-r from-white to-slate-50 dark:from-slate-800 dark:to-slate-700 rounded-2xl border border-slate-200 dark:border-slate-600 shadow-lg hover:shadow-xl transition-all duration-500 hover:scale-[1.02]">
-    //                     <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-    //                     <div className="relative flex items-center justify-between p-5">
-    //                         <div className="flex items-center gap-4 flex-1">
-    //                             <div className={`w-14 h-14 bg-gradient-to-br ${getFileColor(message.file_name || '', message.message_type)} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-    //                                 {getFileIcon(message.file_name || '', message.message_type)}
-    //                             </div>
-    //                             <div className="flex-1 min-w-0">
-    //                                 <div className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors duration-300">
-    //                                     {message.file_name}
-    //                                 </div>
-    //                                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
-    //                                     <span>{message.formatted_file_size || (message.file_size ? formatFileSize(parseInt(message.file_size)) : 'Unknown size')}</span>
-    //                                     <span className="w-1 h-1 bg-slate-300 dark:bg-slate-600 rounded-full" />
-    //                                     <span className="capitalize">{getFileExtension(message.file_name || '')} file</span>
-    //                                 </div>
-    //                                 <div className="text-xs text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
-    //                                     <Sparkles className="w-3 h-3" />
-    //                                     <span>Click to view options</span>
-    //                                 </div>
-    //                             </div>
-    //                         </div>
-    //                         <FileDropdown message={message} />
-    //                     </div>
-    //                 </div>
-    //                 {message.message && message.message !== message.file_name && (
-    //                     <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
-    //                         {message.message}
-    //                     </p>
-    //                 )}
-    //             </div>
-    //         );
-    //     } else if (message.message_type === 'image') {
-    //         return (
-    //             <div className="space-y-3">
-    //                 {message.file_url && (
-    //                     <div className="relative group overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:scale-[1.02]">
-    //                         <img
-    //                             src={message.file_url}
-    //                             alt={message.file_name || 'Image'}
-    //                             className="max-w-full max-h-80 w-full object-cover cursor-pointer transition-all duration-500 group-hover:brightness-110"
-    //                             onClick={() => setImageViewer({
-    //                                 isOpen: true,
-    //                                 imageUrl: message.file_url || '',
-    //                                 imageName: message.file_name || 'Image',
-    //                                 imageSize: message.file_size ? formatFileSize(parseInt(message.file_size)) : undefined
-    //                             })}
-    //                         />
-    //                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-    //                         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-    //                             <FileDropdown message={message} />
-    //                         </div>
-    //                         <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-    //                             <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm text-white px-3 py-2 rounded-xl text-sm">
-    //                                 <ImageIcon className="w-4 h-4" />
-    //                                 <span>Click to view full size</span>
-    //                             </div>
-    //                         </div>
-    //                     </div>
-    //                 )}
-    //                 {message.message && (
-    //                     <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
-    //                         {message.message}
-    //                     </p>
-    //                 )}
-    //             </div>
-    //         );
-    //     }
-        
-    //     return <p className="text-sm text-slate-700 dark:text-slate-300">{message.message}</p>;
-    // };
 
     
     const renderMessageContent = (message: Message) => {
@@ -1875,7 +1863,6 @@ export default function ChatPage({ setComponent }: ChatPageProps) {
                                     await downloadImageToLocal(imageViewer.imageUrl, imageViewer.imageName);
                                 } catch (error) {
                                     console.error('Error downloading image:', error);
-                                    alert('Failed to download image. Please try again.');
                                 }
                             }}
                             className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"

@@ -116,6 +116,38 @@ class ChatService {
             message_ids: messageIds,
         });
     }
+
+    // Download file with CORS handling
+    async downloadFile(fileUrl: string, fileName: string): Promise<Blob> {
+        try {
+            // Try direct fetch with no-cors mode first
+            const response = await fetch(fileUrl, {
+                method: 'GET',
+                mode: 'no-cors', // This allows us to get the response even with CORS issues
+                credentials: 'include',
+                headers: {
+                    'Accept': '*/*',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache',
+                }
+            });
+            
+            if (response.type === 'opaque') {
+                // If we get an opaque response, we can't access the blob directly
+                // This means CORS is blocking us, so we'll throw an error to trigger fallback
+                throw new Error('CORS blocked - using fallback method');
+            }
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.blob();
+        } catch (error) {
+            console.warn('Direct fetch failed, will use fallback methods:', error);
+            throw error;
+        }
+    }
 }
 
 export const chatService = new ChatService(); 

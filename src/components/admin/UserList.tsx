@@ -108,11 +108,6 @@ const tabs = [
 
 const actionOptions = ["Ativar", "Bloquear", "Remover"];
 
-function handleAdminAction(type, email, action) {
-    // Placeholder: Replace with real logic (API call, state update, etc)
-    alert(`Admin action: ${action} on ${type} ${email}`);
-}
-
 function usePagination(data, initialRowsPerPage = 5) {
     const [page, setPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(initialRowsPerPage);

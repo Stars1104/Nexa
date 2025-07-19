@@ -11,12 +11,10 @@ const CampaignDataManager: React.FC = () => {
 
   const handleClearData = () => {
     clearCampaignData();
-    alert('Campaign data cleared from Redux store!');
   };
 
   const handleClearFromStorage = () => {
     clearCampaignDataFromStorage();
-    alert('Campaign data cleared from both Redux store and localStorage!');
   };
 
   return (
